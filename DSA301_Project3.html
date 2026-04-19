@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSA 301 — Project 3: Map Visualizations · Answered Version by Mustafa Bozyel 32417</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Leaflet.heat plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1A2E4A;--teal:#0F6B6B;--amber:#B45309;--red:#991B1B;
+  --blue-l:#DBEAFE;--blue-m:#93C5FD;--green-l:#DCFCE7;--yellow-l:#FEF3C7;
+  --red-l:#FEE2E2;--purple-l:#EDE9FE;--orange-l:#FFF7ED;
+  --gray:#CBD5E1;--lgray:#F3F4F6;--dgray:#64748B;--white:#FFFFFF;
+  --sidebar:260px;
+  --font-sans:'Segoe UI',system-ui,sans-serif;
+  --font-serif:Georgia,serif;
+  --font-mono:'Courier New',monospace;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1.65}
+
+/* ── SIDEBAR ──────────────────────────────────────────────────────── */
+#sidebar{
+  position:fixed;top:0;left:0;width:var(--sidebar);height:100vh;
+  background:var(--navy);color:#fff;overflow-y:auto;z-index:100;
+  display:flex;flex-direction:column;
+}
+#sidebar-header{
+  padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.1);
+  background:rgba(0,0,0,0.2);
+}
+#sidebar-header h1{font-size:13px;font-weight:800;letter-spacing:.5px;line-height:1.3;color:#fff}
+#sidebar-header p{font-size:10px;color:#7AAABB;margin-top:4px;font-style:italic}
+#sidebar-header .author-line{font-size:10px;color:#6EE7B7;margin-top:8px;font-style:normal;font-weight:600;letter-spacing:.2px;line-height:1.35}
+.cover-author-wrap{text-align:center;margin-bottom:4px}
+.cover-author{
+  display:inline-block;margin:0 auto 20px;padding:8px 18px;border-radius:999px;
+  background:rgba(15,107,107,0.45);border:1px solid rgba(110,231,183,0.45);
+  color:#ECFDF5;font-size:12px;font-weight:700;letter-spacing:.2px;
+}
+.nav-section{padding:10px 0 4px 14px;font-size:9px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:#7AAABB;margin-top:6px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;
+  font-size:12px;color:rgba(255,255,255,0.75);transition:all .2s;border:none;
+  background:none;width:100%;text-align:left;
+}
+.nav-item:hover{background:rgba(255,255,255,0.08);color:#fff}
+.nav-item.active{background:rgba(15,107,107,0.4);color:#fff;border-left:3px solid var(--teal)}
+.nav-item .icon{font-size:14px;flex-shrink:0;width:20px;text-align:center}
+.nav-info{padding:14px;margin-top:auto;border-top:1px solid rgba(255,255,255,0.1)}
+.nav-info p{font-size:10px;color:#7AAABB;line-height:1.5}
+.nav-info .due{font-weight:700;color:#F59E0B;font-size:11px;margin-bottom:4px}
+.task-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:12px;font-size:10px;font-weight:700;
+  border:1px solid rgba(255,255,255,0.2);margin-top:6px;width:100%;
+}
+.task-pill.pen{background:rgba(180,83,9,0.3);color:#FCD34D}
+.task-pill.code{background:rgba(15,107,107,0.3);color:#6EE7B7}
+
+/* ── MAIN ─────────────────────────────────────────────────────────── */
+#main{margin-left:var(--sidebar);min-height:100vh}
+
+/* ── COVER ────────────────────────────────────────────────────────── */
+#cover{
+  min-height:100vh;background:linear-gradient(145deg,var(--navy) 0%,#1A4060 50%,#0F6B6B 100%);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  text-align:center;padding:60px 40px;position:relative;overflow:hidden;
+}
+#cover::before{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+.cover-inner{position:relative;z-index:1;max-width:760px;width:100%}
+.cover-badge-row{display:flex;justify-content:center;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.cover-badge{
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+  color:rgba(255,255,255,0.75);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+  padding:5px 16px;border-radius:20px;
+}
+.cover-badge.accent{background:rgba(15,107,107,0.5);border-color:rgba(15,107,107,0.8);color:#6EE7B7}
+#cover h1{font-size:clamp(26px,4.5vw,50px);font-weight:900;color:#fff;letter-spacing:-1.5px;
+  font-family:var(--font-serif);line-height:1.1;margin-bottom:10px}
+#cover .subtitle{font-size:17px;color:rgba(255,255,255,0.65);margin-bottom:8px}
+#cover .desc{font-size:13.5px;color:rgba(255,255,255,0.45);max-width:560px;margin:0 auto 36px;line-height:1.8}
+.cover-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:680px;width:100%;margin:0 auto 36px}
+.cover-card{
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);
+  border-radius:12px;padding:18px 14px;text-align:left;
+}
+.cover-card .c-icon{font-size:26px;margin-bottom:8px}
+.cover-card .c-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:#7AAABB;margin-bottom:4px}
+.cover-card h3{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px}
+.cover-card p{font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5}
+.cover-card .method-tag{
+  display:inline-block;margin-top:8px;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:600;
+}
+.method-pen{background:rgba(180,83,9,0.4);color:#FCD34D;border:1px solid rgba(180,83,9,0.5)}
+.method-code{background:rgba(15,107,107,0.4);color:#6EE7B7;border:1px solid rgba(15,107,107,0.5)}
+.cover-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:680px;width:100%;margin:0 auto}
+.meta-item{background:rgba(0,0,0,0.2);border-radius:8px;padding:12px}
+.meta-item .m-label{font-size:9px;color:#7AAABB;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.meta-item .m-value{font-size:13px;font-weight:700;color:#fff}
+
+/* ── SECTION DIVIDER ──────────────────────────────────────────────── */
+.section-divider{
+  background:linear-gradient(135deg,var(--navy),#1A4060);
+  padding:36px 50px;color:#fff;
+}
+.section-divider .sec-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:#7AAABB;margin-bottom:8px}
+.section-divider h2{font-size:26px;font-weight:800;font-family:var(--font-serif);letter-spacing:-.5px}
+.section-divider p{font-size:14px;color:rgba(255,255,255,0.6);margin-top:8px;max-width:640px}
+.sec-chips{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.sec-chip{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+  color:rgba(255,255,255,0.8);padding:4px 12px;border-radius:14px;font-size:11px}
+.sec-chip.pen-chip{background:rgba(180,83,9,0.3);border-color:rgba(180,83,9,0.5);color:#FCD34D}
+.sec-chip.code-chip{background:rgba(15,107,107,0.3);border-color:rgba(15,107,107,0.5);color:#6EE7B7}
+
+/* ── TASK CARD ────────────────────────────────────────────────────── */
+.task-card{background:#fff;border-radius:16px;margin:24px 32px;
+  box-shadow:0 2px 14px rgba(0,0,0,0.08);overflow:hidden}
+.t-header{padding:22px 28px 18px;border-bottom:1px solid #F1F5F9;
+  display:flex;align-items:flex-start;gap:16px}
+.t-num{
+  width:48px;height:48px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;color:#fff;
+}
+.t-num.navy{background:var(--navy)}
+.t-num.teal{background:var(--teal)}
+.t-num.amber{background:var(--amber)}
+.t-meta{flex:1}
+.t-meta h3{font-size:18px;font-weight:700;color:#0F172A;margin-bottom:6px;line-height:1.3}
+.t-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;
+  background:var(--lgray);color:var(--dgray);letter-spacing:.3px}
+.tag.pen{background:#FEF3C7;color:#92400E}
+.tag.code{background:#DCFCE7;color:#14532D}
+.tag.pts{background:#EDE9FE;color:#5B21B6}
+.tag.data{background:#DBEAFE;color:#1E40AF}
+.t-body{padding:24px 28px}
+
+/* ── THEORY BOX ───────────────────────────────────────────────────── */
+.theory-box{
+  background:linear-gradient(135deg,#EFF6FF,#E0F2FE);
+  border-left:4px solid var(--navy);border-radius:0 10px 10px 0;
+  padding:18px 20px;margin-bottom:20px;
+}
+.theory-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.theory-box p,.theory-box li{font-size:13.5px;color:#1E3A5F;line-height:1.75}
+.theory-box ul{padding-left:20px;margin-top:8px}
+.theory-box li{margin-bottom:5px}
+.theory-box strong{color:var(--navy)}
+.formula{
+  background:rgba(255,255,255,0.8);border:1px solid #BFDBFE;border-radius:8px;
+  padding:12px 16px;margin:12px 0;font-family:var(--font-mono);font-size:13.5px;
+  color:var(--navy);text-align:center;font-weight:600;
+}
+
+/* ── TASK PARTS ───────────────────────────────────────────────────── */
+.task-parts{display:flex;flex-direction:column;gap:14px;margin:20px 0}
+.task-part{
+  background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:18px 20px;
+}
+.part-label{
+  font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--teal);
+  text-transform:uppercase;margin-bottom:8px
+}
+.task-part p{font-size:14px;color:#334155;line-height:1.75}
+.task-part ul{font-size:14px;color:#334155;padding-left:20px;margin-top:8px}
+.task-part ul li{margin-bottom:6px;line-height:1.65}
+.part-answer{margin-top:18px;padding:16px 18px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px}
+.part-answer-label{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.6px;text-transform:uppercase;margin-bottom:12px}
+.part-answer p{font-size:14px;color:#334155;line-height:1.75;margin-bottom:12px}
+.part-answer p:last-child{margin-bottom:0}
+
+/* ── FIG WRAP ─────────────────────────────────────────────────────── */
+.fig-wrap{
+  background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
+  padding:20px;margin:20px 0;text-align:center;
+}
+.fig-caption{font-size:11.5px;color:var(--dgray);margin-top:12px;font-style:italic;line-height:1.5}
+.figure-submission-img{max-width:100%;height:auto;border-radius:8px;border:1px solid #E2E8F0;display:block;margin:0 auto}
+
+/* ── MAP CONTAINER ────────────────────────────────────────────────── */
+.map-container{
+  border-radius:10px;overflow:hidden;border:1px solid #CBD5E1;
+  height:400px;margin:16px 0;
+}
+.map-label{
+  background:var(--navy);color:#fff;font-size:11px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;padding:8px 14px;
+  border-radius:8px 8px 0 0;
+}
+
+/* ── CODE BLOCK ───────────────────────────────────────────────────── */
+.code-block{
+  background:#0F172A;border-radius:10px;padding:18px 20px;margin:16px 0;
+  overflow-x:auto;
+}
+.code-block pre{font-family:var(--font-mono);font-size:12.5px;color:#94A3B8;line-height:1.7;
+  white-space:pre;tab-size:2}
+.code-block .kw{color:#C084FC}
+.code-block .fn{color:#60A5FA}
+.code-block .str{color:#86EFAC}
+.code-block .cm{color:#64748B;font-style:italic}
+.code-label{font-size:10px;font-weight:700;letter-spacing:1px;color:#475569;
+  text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+
+/* ── RUBRIC TABLE ─────────────────────────────────────────────────── */
+.rubric-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.rubric-table th{background:var(--navy);color:#fff;padding:10px 14px;text-align:left;font-size:11.5px;font-weight:700}
+.rubric-table td{padding:9px 14px;border-bottom:1px solid #E2E8F0;color:#334155;vertical-align:top}
+.rubric-table tr:nth-child(even) td{background:#F8FAFC}
+.rubric-table .pts-col{text-align:center;font-weight:700;color:var(--teal)}
+
+/* ── SUBMISSION BOX ───────────────────────────────────────────────── */
+.submit-box{
+  background:linear-gradient(135deg,#F0FDF4,#DCFCE7);
+  border:1px solid #86EFAC;border-radius:12px;padding:20px 24px;margin-top:24px;
+}
+.submit-box h4{font-size:14px;font-weight:700;color:#14532D;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px}
+.submit-box ul{font-size:13.5px;color:#166534;padding-left:20px}
+.submit-box ul li{margin-bottom:6px;line-height:1.6}
+
+/* ── CALLOUT ──────────────────────────────────────────────────────── */
+.callout{border-radius:10px;padding:14px 18px;margin:16px 0;display:flex;gap:12px;align-items:flex-start}
+.callout.info{background:#EFF6FF;border:1px solid #BFDBFE}
+.callout.warn{background:#FFF7ED;border:1px solid #FED7AA}
+.callout.tip{background:#F0FDF4;border:1px solid #BBF7D0}
+.callout-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.callout-body{font-size:13.5px;color:#334155;line-height:1.65}
+.callout-body strong{color:#1E293B}
+
+/* ── DATA TABLE ───────────────────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0}
+.data-table th{background:var(--navy);color:#fff;padding:9px 12px;text-align:left;font-size:12px;font-weight:700}
+.data-table td{padding:8px 12px;border-bottom:1px solid #E2E8F0;color:#334155;font-family:var(--font-mono);font-size:12px}
+.data-table tr:nth-child(even) td{background:#F8FAFC}
+
+/* ── FOOTER ───────────────────────────────────────────────────────── */
+#footer{
+  background:var(--navy);color:rgba(255,255,255,0.5);
+  text-align:center;padding:18px;font-size:11.5px;margin-left:var(--sidebar);
+  letter-spacing:.3px;
+}
+
+/* ── MENU TOGGLE (mobile) ─────────────────────────────────────────── */
+#menu-toggle{
+  display:none;position:fixed;bottom:20px;right:20px;z-index:200;
+  background:var(--teal);color:#fff;border:none;border-radius:50%;
+  width:44px;height:44px;font-size:18px;cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3);
+}
+@media(max-width:768px){
+  #menu-toggle{display:flex;align-items:center;justify-content:center}
+  #main,#footer{margin-left:0}
+  #sidebar{transform:translateX(-100%);transition:transform .3s}
+  #sidebar.open{transform:translateX(0)}
+  .cover-grid{grid-template-columns:1fr}
+  .cover-meta{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── PROJECTION SVG HELPERS ───────────────────────────────────────── */
+.proj-container{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:16px 0}
+.proj-box{background:#fff;border:2px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.proj-box-title{background:var(--navy);color:#fff;font-size:11px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;padding:8px 14px}
+.proj-box-body{padding:10px}
+.proj-note{font-size:11.5px;color:var(--dgray);margin-top:8px;font-style:italic;line-height:1.5;padding:0 4px}
+
+@media(max-width:600px){.proj-container{grid-template-columns:1fr}}
+
+/* ── STEP INDICATOR ───────────────────────────────────────────────── */
+.steps{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step-num{
+  width:28px;height:28px;border-radius:50%;background:var(--teal);
+  color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;margin-top:1px;
+}
+.step-body{font-size:13.5px;color:#334155;line-height:1.65;flex:1}
+.step-body strong{color:#0F172A}
+</style>
+</head>
+<body>
+
+<!-- ─── SIDEBAR ──────────────────────────────────────────────────── -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <h1>DSA 301 · Data Visualization</h1>
+    <p>Project 3 — Map Visualizations</p>
+    <p class="author-line">Answered Version · Mustafa Bozyel · 32417</p>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <button class="nav-item active" onclick="navTo('cover')">
+    <span class="icon">🗺</span> Project Brief
+  </button>
+
+  <div class="nav-section">Tasks</div>
+  <button class="nav-item" onclick="navTo('task1')">
+    <span class="icon">✏️</span> Task 1 · Projections
+  </button>
+  <button class="nav-item" onclick="navTo('task2')">
+    <span class="icon">🏷</span> Task 2 · Label Placement
+  </button>
+  <button class="nav-item" onclick="navTo('task3')">
+    <span class="icon">🔥</span> Task 3 · Kernel Density
+  </button>
+
+  <div class="nav-section">Grading</div>
+  <button class="nav-item" onclick="navTo('rubric')">
+    <span class="icon">📋</span> Rubric &amp; Submission
+  </button>
+
+  <div class="nav-info">
+    <div class="due">📅 Submit via SuCourse</div>
+    <p>Zip your HTML report + any scripts. Include your full name and student ID in the filename.</p>
+    <div class="task-pill pen">✏️ Task 1 — Paper &amp; Pen</div>
+    <div class="task-pill code" style="margin-top:6px">💻 Tasks 2 &amp; 3 — Coded</div>
+  </div>
+</nav>
+
+<!-- ─── MAIN ─────────────────────────────────────────────────────── -->
+<main id="main">
+
+<!-- ─── COVER ────────────────────────────────────────────────────── -->
+<section id="cover">
+  <div class="cover-inner">
+    <div class="cover-badge-row">
+      <span class="cover-badge">DSA 301 · Data Visualization</span>
+      <span class="cover-badge accent">Project 3 of 3</span>
+      <span class="cover-badge">Lecture 13 — Map Visualizations</span>
+    </div>
+
+    <div class="cover-author-wrap"><span class="cover-author">Answered Version by Mustafa Bozyel · 32417</span></div>
+
+    <h1>Mapping Space:<br>Projections, Labels &amp; Density</h1>
+    <p class="subtitle">NYC Taxi Mobility Data · April 5, 2016</p>
+    <p class="desc">In this project you will apply three core map-visualization techniques: compare how different map projections distort space, implement principled label placement on a live map, and reveal mobility patterns using kernel density estimation on real taxi-trip data.</p>
+
+    <div class="cover-grid">
+      <div class="cover-card">
+        <div class="c-icon">🌐</div>
+        <div class="c-label">Task 1</div>
+        <h3>Map Projections</h3>
+        <p>Sketch and analyze two projections for a NYC-area map</p>
+        <span class="method-tag method-pen">✏️ Paper &amp; Pen</span>
+      </div>
+      <div class="cover-card">
+        <div class="c-icon">🏷</div>
+        <div class="c-label">Task 2</div>
+        <h3>Label Placement</h3>
+        <p>Apply conflict-free label placement to taxi pickup hotspots</p>
+        <span class="method-tag method-code">💻 Coded (JS / OSM)</span>
+      </div>
+      <div class="cover-card">
+        <div class="c-icon">🔥</div>
+        <div class="c-label">Task 3</div>
+        <h3>Kernel Density</h3>
+        <p>Estimate and visualize the density of taxi pickups</p>
+        <span class="method-tag method-code">💻 Coded (JS / OSM)</span>
+      </div>
+    </div>
+
+    <div class="cover-meta">
+      <div class="meta-item">
+        <div class="m-label">Course</div>
+        <div class="m-value">DSA 301</div>
+      </div>
+      <div class="meta-item">
+        <div class="m-label">Dataset</div>
+        <div class="m-value">NYC Taxi · 1 day</div>
+      </div>
+      <div class="meta-item">
+        <div class="m-label">Total Points</div>
+        <div class="m-value">100 pts</div>
+      </div>
+      <div class="meta-item">
+        <div class="m-label">Format</div>
+        <div class="m-value">HTML Report</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  TASK 1 — PROJECTIONS                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="task1">
+<div class="section-divider">
+  <div class="sec-label">Task 1 of 3</div>
+  <h2>✏️ Map Projections — Paper &amp; Pen</h2>
+  <p>Understand how the choice of projection fundamentally alters spatial relationships — area, shape, distance, and direction — with specific focus on the New York City region.</p>
+  <div class="sec-chips">
+    <span class="sec-chip pen-chip">✏️ Paper &amp; Pen Required</span>
+    <span class="sec-chip">30 points</span>
+    <span class="sec-chip">Two projections</span>
+    <span class="sec-chip">⏱ ~45 min</span>
+  </div>
+</div>
+
+<div class="task-card">
+  <div class="t-header">
+    <div class="t-num navy">T1</div>
+    <div class="t-meta">
+      <h3>Mercator vs. Albers Equal-Area Conic — a Tale of Two Projections</h3>
+      <div class="t-tags">
+        <span class="tag pen">✏️ Paper &amp; Pen</span>
+        <span class="tag pts">30 pts</span>
+        <span class="tag">4 parts</span>
+      </div>
+    </div>
+  </div>
+  <div class="t-body">
+
+    <div class="theory-box">
+      <div class="theory-label">📐 Background — The Two Projections</div>
+      <p>Every flat map is a <strong>mathematical transformation</strong> of the spherical Earth. No single projection can simultaneously preserve area, shape, distance, and direction — each choice involves trade-offs. For this task you will compare two projections commonly used for maps of the north-eastern United States:</p>
+      <ul>
+        <li><strong>Web Mercator (EPSG:3857)</strong> — a conformal (shape-preserving) cylindrical projection. It is the default for web maps (OpenStreetMap, Google Maps). At NYC's latitude (~40.7°N) it inflates areas by a factor of k² ≈ 1.72 relative to the equator. The city's grid looks "correct" locally, but the projection severely distorts area at higher latitudes.</li>
+        <li><strong>Albers Equal-Area Conic (EPSG:5070)</strong> — preserves <em>area</em> by using two standard parallels that hug the region of interest. For a map centred on NYC (standard parallels: 29.5°N and 45.5°N), shapes in the urban core are accurate and the scale error across the five boroughs is less than 0.1%. It is the standard projection for US Census and environmental data products.</li>
+      </ul>
+    </div>
+
+    <!-- Reference diagrams -->
+    <div class="fig-wrap">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+        <!-- Mercator SVG -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Mercator (cylindrical)</div>
+          <svg viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;border-radius:8px;border:1px solid #E2E8F0">
+            <!-- Ocean bg -->
+            <rect width="300" height="220" fill="#D6E8F0"/>
+            <!-- Grid lines (meridians) -->
+            <g stroke="#B0CEE0" stroke-width="0.7" opacity="0.8">
+              <line x1="50" y1="10" x2="50" y2="210"/>
+              <line x1="100" y1="10" x2="100" y2="210"/>
+              <line x1="150" y1="10" x2="150" y2="210"/>
+              <line x1="200" y1="10" x2="200" y2="210"/>
+              <line x1="250" y1="10" x2="250" y2="210"/>
+            </g>
+            <!-- Grid lines (parallels) — spacing INCREASES with latitude in Mercator -->
+            <g stroke="#B0CEE0" stroke-width="0.7" opacity="0.8">
+              <!-- Equator at y=170, spacing increases toward poles -->
+              <line x1="10" y1="170" x2="290" y2="170"/> <!-- 0° equator -->
+              <line x1="10" y1="145" x2="290" y2="145"/> <!-- ~20°N -->
+              <line x1="10" y1="110" x2="290" y2="110"/> <!-- ~40°N (NYC) -->
+              <line x1="10" y1="75" x2="290" y2="75"/>  <!-- ~55°N -->
+              <line x1="10" y1="30" x2="290" y2="30"/>  <!-- ~70°N -->
+            </g>
+            <!-- NYC region highlight -->
+            <rect x="65" y="98" width="58" height="24" rx="3" fill="#1A2E4A" opacity="0.18" stroke="#1A2E4A" stroke-width="1.5"/>
+            <!-- Tissot circles showing distortion -->
+            <ellipse cx="150" cy="170" rx="10" ry="10" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <ellipse cx="150" cy="110" rx="13.7" ry="13.7" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <ellipse cx="150" cy="30" rx="29" ry="29" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <!-- Labels -->
+            <text x="150" y="178" font-size="8" fill="#991B1B" text-anchor="middle" font-weight="600">0° (k=1.0)</text>
+            <text x="192" y="106" font-size="8" fill="#991B1B" text-anchor="start">~40°N (k=1.31)</text>
+            <text x="185" y="28" font-size="8" fill="#991B1B" text-anchor="start">~70°N (k=2.92)</text>
+            <!-- NYC label -->
+            <text x="94" y="94" font-size="8.5" fill="#1A2E4A" text-anchor="middle" font-weight="700">NYC</text>
+            <!-- Title -->
+            <text x="150" y="205" font-size="9" fill="#64748B" text-anchor="middle" font-style="italic">Mercator — parallels spread toward poles</text>
+          </svg>
+          <div class="proj-note">Circles (Tissot indicatrices) stay <em>round</em> (conformal) but <em>grow</em> rapidly poleward. At NYC (40.7°N) areas are inflated by ×1.72.</div>
+        </div>
+
+        <!-- Albers SVG -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Albers Equal-Area Conic</div>
+          <svg viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;border-radius:8px;border:1px solid #E2E8F0">
+            <rect width="300" height="220" fill="#D6E8F0"/>
+            <!-- Conic curved parallels -->
+            <g fill="none" stroke="#B0CEE0" stroke-width="0.8" opacity="0.9">
+              <!-- Parallels as arcs (simulated with paths) -->
+              <path d="M 10,190 Q 150,155 290,190"/>
+              <path d="M 20,148 Q 150,115 280,148"/>
+              <path d="M 35,108 Q 150,78 265,108"/>
+              <path d="M 50,72 Q 150,44 250,72"/>
+              <path d="M 65,42 Q 150,16 235,42"/>
+            </g>
+            <!-- Conic meridians converging upward -->
+            <g stroke="#B0CEE0" stroke-width="0.8" opacity="0.9">
+              <line x1="150" y1="0" x2="10" y2="210"/>
+              <line x1="150" y1="0" x2="70" y2="210"/>
+              <line x1="150" y1="0" x2="150" y2="210"/>
+              <line x1="150" y1="0" x2="230" y2="210"/>
+              <line x1="150" y1="0" x2="290" y2="210"/>
+            </g>
+            <!-- Standard parallels highlighted -->
+            <path d="M 30,110 Q 150,80 270,110" stroke="#0F6B6B" stroke-width="2" fill="none" stroke-dasharray="4,3"/>
+            <path d="M 45,74 Q 150,46 255,74" stroke="#0F6B6B" stroke-width="2" fill="none" stroke-dasharray="4,3"/>
+            <text x="272" y="107" font-size="8" fill="#0F6B6B" font-weight="700">29.5°N</text>
+            <text x="257" y="71" font-size="8" fill="#0F6B6B" font-weight="700">45.5°N</text>
+            <!-- NYC region highlight -->
+            <rect x="118" y="102" width="46" height="22" rx="3" fill="#1A2E4A" opacity="0.2" stroke="#1A2E4A" stroke-width="1.5"/>
+            <text x="141" y="116" font-size="8.5" fill="#1A2E4A" text-anchor="middle" font-weight="700">NYC</text>
+            <!-- Tissot circles — all approximately equal area -->
+            <ellipse cx="80" cy="170" rx="10" ry="9.5" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <ellipse cx="150" cy="113" rx="10" ry="9.8" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <ellipse cx="220" cy="60" rx="10" ry="9.5" fill="none" stroke="#C0392B" stroke-width="1.5" opacity="0.7"/>
+            <!-- Label -->
+            <text x="150" y="205" font-size="9" fill="#64748B" text-anchor="middle" font-style="italic">Albers — equal-area, conic meridians converge</text>
+          </svg>
+          <div class="proj-note">Tissot circles remain equal in <em>area</em> across the map. Shapes are slightly compressed east–west near the poles but accurate near the two standard parallels.</div>
+        </div>
+      </div>
+
+      <div class="fig-caption">
+        Fig 1 — Schematic graticule comparison. <strong>Left:</strong> Web Mercator — rectangular grid, parallel spacing increases poleward; Tissot indicatrices (red circles) grow dramatically. <strong>Right:</strong> Albers Equal-Area Conic — fan-shaped grid converging to apex; dashed teal lines mark the two standard parallels (29.5°N, 45.5°N) where scale error is zero; Tissot circles maintain equal area. NYC bounding box shown in dark blue on both.
+      </div>
+    </div>
+
+    <!-- Properties comparison table -->
+    <div class="fig-wrap" style="margin-top:0">
+      <table class="rubric-table" style="font-size:12.5px">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Web Mercator</th>
+            <th>Albers Equal-Area Conic</th>
+            <th>Better for NYC?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Conformal (preserves shape)</strong></td>
+            <td>✅ Yes — locally</td>
+            <td>❌ No (slight shape distortion)</td>
+            <td>Mercator</td>
+          </tr>
+          <tr>
+            <td><strong>Equal-area (preserves area)</strong></td>
+            <td>❌ No (area inflated ×1.72 at NYC)</td>
+            <td>✅ Yes</td>
+            <td>Albers</td>
+          </tr>
+          <tr>
+            <td><strong>Scale error at 40.7°N</strong></td>
+            <td>~31% linear, ~72% area</td>
+            <td>&lt; 0.1% (near standard parallels)</td>
+            <td>Albers</td>
+          </tr>
+          <tr>
+            <td><strong>North-up orientation</strong></td>
+            <td>✅ Always</td>
+            <td>✅ Yes (for standard orientation)</td>
+            <td>Tie</td>
+          </tr>
+          <tr>
+            <td><strong>Compass bearing accuracy</strong></td>
+            <td>✅ Locally (rhumb lines are straight)</td>
+            <td>❌ Meridians converge</td>
+            <td>Mercator</td>
+          </tr>
+          <tr>
+            <td><strong>Best use case</strong></td>
+            <td>Navigation, street-level web maps, tile servers</td>
+            <td>Thematic maps, density, area statistics</td>
+            <td>Depends on task</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="fig-caption">Fig 2 — Projection property comparison for a NYC-centred map. Study this table before completing the tasks below.</div>
+    </div>
+
+    <!-- Task Parts -->
+    <div class="task-parts">
+      <div class="task-part">
+        <div class="part-label">Part A — Graticule Sketch (12 pts)</div>
+        <p>On <strong>blank A4 paper</strong>, draw two side-by-side bounding boxes of identical width (approx. 10 cm each). Inside each box, sketch the graticule (meridians + parallels) for the region 70°W – 76°W, 40°N – 42°N (the NYC metro area, approximately) for each projection:</p>
+        <ul>
+          <li><strong>Box 1 — Web Mercator:</strong> Draw a regular rectangular grid (meridians are vertical, parallels are horizontal). Mark at least 3 meridians and 3 parallels.</li>
+          <li><strong>Box 2 — Albers Equal-Area Conic (standard parallels 29.5°N, 45.5°N):</strong> Draw fan-shaped meridians converging toward an apex above the map, and curved parallels as arcs. At NYC's latitude your meridians should converge at an angle; calculate the convergence angle approximately as: <em>n ≈ (sin 29.5° + sin 45.5°) / 2 ≈ 0.564</em>, so meridians 6° apart converge by about <em>0.564 × 6° ≈ 3.4°</em> at the northern edge.</li>
+        </ul>
+        <p style="margin-top:8px">Label the axes with degree values and note the projection name.</p>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part B — Tissot Indicatrices (8 pts)</div>
+        <p>On your Part A sketches, draw <strong>Tissot indicatrix circles</strong> at the following three locations on each projection. Use the scale factors below to size them proportionally (let the equatorial/southern reference circle have radius 1 cm).</p>
+        <table class="data-table" style="margin-top:12px">
+          <tr><th>Location</th><th>Lat</th><th>Mercator — linear scale k</th><th>Circle radius (cm)</th><th>Albers scale error</th></tr>
+          <tr><td>Southern NJ coast</td><td>39°N</td><td>k = 1/cos(39°) ≈ 1.29</td><td>1.29 cm (Mercator) / 1.0 cm (Albers)</td><td>&lt; 0.1%</td></tr>
+          <tr><td>Manhattan</td><td>40.7°N</td><td>k = 1/cos(40.7°) ≈ 1.31</td><td>1.31 cm (Mercator) / ~1.0 cm (Albers)</td><td>&lt; 0.1%</td></tr>
+          <tr><td>Upstate NY</td><td>42°N</td><td>k = 1/cos(42°) ≈ 1.35</td><td>1.35 cm (Mercator) / ~1.0 cm (Albers)</td><td>&lt; 0.2%</td></tr>
+        </table>
+        <p style="margin-top:10px">Note: On Mercator, circles remain <em>perfectly round</em> (conformal) but grow. On Albers, circles stay nearly the <em>same size</em> but become slightly elliptical (area is preserved, shape is not). Sketch both effects clearly and annotate them.</p>
+      </div>
+
+      <div class="fig-wrap">
+        <img class="figure-submission-img" src="task1-ab.jpeg" alt="Task 1 Parts A and B: Web Mercator and Albers graticule sketches with Tissot indicatrices at three locations">
+        <div class="fig-caption">Figure T1-A/B — Submitted answer for Parts A &amp; B: side-by-side graticules (70°W–76°W, 40°N–42°N) for Web Mercator and Albers Equal-Area Conic, with Tissot indicatrices sized per the table above.</div>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part C — Written Analysis (6 pts)</div>
+        <p>In no more than <strong>150 words</strong>, answer the following:</p>
+        <ul>
+          <li>You are designing an interactive web map for NYC taxi data (similar to Task 3 in this project). Which projection should the tile server use — Mercator or Albers? Why? (Consider: tile grid efficiency, user expectation for a city map, and the practical use case of the taxi density layer.)</li>
+          <li>Now imagine instead you are producing a <strong>printed choropleth map</strong> of taxi pickup density per km² across the five NYC boroughs for a data journalism article. Does your answer change? Why or why not?</li>
+        </ul>
+        <div class="part-answer">
+          <div class="part-answer-label">Part C — response (≤150 words)</div>
+          <p>For an interactive web map of NYC taxi data, the tile server should use <strong>Web Mercator (EPSG:3857)</strong>. Major basemap providers distribute square tiles in this projection, so adopting Mercator avoids costly reprojection, simplifies caching, and keeps the global tile pyramid standard. Users expect street layouts and north-up navigation familiar from everyday web maps. A taxi-density or KDE layer then aligns with the roads beneath it; at roughly 40.7°N local area inflation is moderate, so hotspot patterns remain readable even though areas are not strictly true-scale.</p>
+          <p>For a <strong>printed choropleth</strong> of pickup rates per km² across boroughs, I would change to <strong>Albers equal-area conic</strong> (or another equal-area projection for the Northeast). Choropleths invite area comparisons: equal-area guarantees polygon sizes on the page match geographic areas so per-km² values are comparable. Web Mercator would distort relative borough sizes and could mislead readers about which borough truly carries more activity per unit land.</p>
+        </div>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part D — Projection Identification (4 pts)</div>
+        <p>Examine the two reference maps below (Figs 3 &amp; 4). For each one, state: (1) the projection type (cylindrical / conic / azimuthal) and whether it is conformal, equal-area, or equidistant; (2) one visible clue in the graticule that supports your answer.</p>
+
+        <div class="proj-container" style="margin-top:14px">
+          <div class="proj-box">
+            <div class="proj-box-title">Fig 3 — Mystery Projection A</div>
+            <div class="proj-box-body">
+              <svg viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+                <rect width="260" height="160" fill="#E8F4F8"/>
+                <!-- Straight meridians, straight parallels with increasing spacing = Mercator -->
+                <g stroke="#A8C8D8" stroke-width="0.6">
+                  <line x1="13" y1="10" x2="13" y2="150"/>
+                  <line x1="46" y1="10" x2="46" y2="150"/>
+                  <line x1="79" y1="10" x2="79" y2="150"/>
+                  <line x1="112" y1="10" x2="112" y2="150"/>
+                  <line x1="145" y1="10" x2="145" y2="150"/>
+                  <line x1="178" y1="10" x2="178" y2="150"/>
+                  <line x1="211" y1="10" x2="211" y2="150"/>
+                  <line x1="244" y1="10" x2="244" y2="150"/>
+                </g>
+                <!-- Horizontal parallels — spacing grows toward top (poles) -->
+                <g stroke="#A8C8D8" stroke-width="0.6">
+                  <line x1="10" y1="140" x2="250" y2="140"/><!-- 0° -->
+                  <line x1="10" y1="118" x2="250" y2="118"/><!-- 20° -->
+                  <line x1="10" y1="90" x2="250" y2="90"/>  <!-- 40° -->
+                  <line x1="10" y1="55" x2="250" y2="55"/>  <!-- 60° -->
+                  <line x1="10" y1="20" x2="250" y2="20"/>  <!-- 75° -->
+                </g>
+                <!-- Degree labels -->
+                <text x="4" y="142" font-size="7" fill="#64748B">0°</text>
+                <text x="4" y="120" font-size="7" fill="#64748B">20°</text>
+                <text x="4" y="92" font-size="7" fill="#64748B">40°</text>
+                <text x="4" y="57" font-size="7" fill="#64748B">60°</text>
+                <text x="4" y="22" font-size="7" fill="#64748B">75°</text>
+                <!-- Tissot circles getting bigger -->
+                <circle cx="112" cy="140" r="7" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <circle cx="112" cy="90" r="9.1" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <circle cx="112" cy="20" r="27" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <text x="130" y="108" font-size="7.5" fill="#64748B" font-style="italic">Projection A</text>
+              </svg>
+            </div>
+          </div>
+          <div class="proj-box">
+            <div class="proj-box-title">Fig 4 — Mystery Projection B</div>
+            <div class="proj-box-body">
+              <svg viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+                <rect width="260" height="160" fill="#E8F4F8"/>
+                <!-- Conic projection: converging straight meridians, curved parallels -->
+                <g stroke="#A8C8D8" stroke-width="0.6">
+                  <!-- Meridians converging to apex around (130, -40) -->
+                  <line x1="130" y1="-40" x2="10" y2="155"/>
+                  <line x1="130" y1="-40" x2="52" y2="158"/>
+                  <line x1="130" y1="-40" x2="95" y2="160"/>
+                  <line x1="130" y1="-40" x2="130" y2="160"/>
+                  <line x1="130" y1="-40" x2="165" y2="160"/>
+                  <line x1="130" y1="-40" x2="208" y2="158"/>
+                  <line x1="130" y1="-40" x2="250" y2="155"/>
+                </g>
+                <!-- Curved parallels as arcs -->
+                <path d="M 20,138 Q 130,115 240,138" fill="none" stroke="#A8C8D8" stroke-width="0.6"/>
+                <path d="M 30,105 Q 130,80 230,105" fill="none" stroke="#A8C8D8" stroke-width="0.6"/>
+                <path d="M 45,72 Q 130,48 215,72" fill="none" stroke="#A8C8D8" stroke-width="0.6"/>
+                <path d="M 62,40 Q 130,18 198,40" fill="none" stroke="#A8C8D8" stroke-width="0.6"/>
+                <!-- Degree labels -->
+                <text x="4" y="138" font-size="7" fill="#64748B">30°</text>
+                <text x="4" y="105" font-size="7" fill="#64748B">40°</text>
+                <text x="4" y="72" font-size="7" fill="#64748B">50°</text>
+                <text x="4" y="40" font-size="7" fill="#64748B">60°</text>
+                <!-- Tissot ellipses — approx equal area but slightly distorted -->
+                <ellipse cx="130" cy="120" rx="9" ry="8.7" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <ellipse cx="80" cy="85" rx="9.2" ry="8.5" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <ellipse cx="180" cy="55" rx="9.1" ry="8.6" fill="none" stroke="#C0392B" stroke-width="1.2" opacity="0.7"/>
+                <text x="140" y="30" font-size="7.5" fill="#64748B" font-style="italic">Projection B</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="fig-caption" style="margin-top:8px">Figs 3 &amp; 4 — Graticule sketches with Tissot indicatrices (red ellipses/circles). For each, identify the projection family and primary property preserved.</div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">📸</span>
+      <div class="callout-body"><strong>Submission:</strong> Photograph or scan your Part A and Part B sketches. Include them as images in your HTML report. Write Parts C and D directly in the HTML. Label all images clearly (e.g., "Figure T1-A: Graticule sketches").</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  TASK 2 — LABEL PLACEMENT                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="task2">
+<div class="section-divider">
+  <div class="sec-label">Task 2 of 3</div>
+  <h2>🏷 Label Placement on a Live Map</h2>
+  <p>Apply principled label placement rules to annotate the top pickup hotspots in the NYC Taxi dataset using Leaflet.js and OpenStreetMap tiles.</p>
+  <div class="sec-chips">
+    <span class="sec-chip code-chip">💻 Coded — JavaScript / Leaflet</span>
+    <span class="sec-chip">35 points</span>
+    <span class="sec-chip">OpenStreetMap API</span>
+    <span class="sec-chip">⏱ ~60 min</span>
+  </div>
+</div>
+
+<div class="task-card">
+  <div class="t-header">
+    <div class="t-num teal">T2</div>
+    <div class="t-meta">
+      <h3>Annotating Pickup Hotspots — Conflict-Free Label Placement</h3>
+      <div class="t-tags">
+        <span class="tag code">💻 Coded</span>
+        <span class="tag pts">35 pts</span>
+        <span class="tag data">NYC Taxi data</span>
+        <span class="tag">Leaflet.js</span>
+      </div>
+    </div>
+  </div>
+  <div class="t-body">
+
+    <div class="theory-box">
+      <div class="theory-label">🏷 Background — Label Placement Principles</div>
+      <p>Placing labels on maps without overlap is a classic computational problem (NP-hard in general). In practice, cartographers apply a set of priority rules that produce good results:</p>
+      <ul>
+        <li><strong>Priority 1 — Preferred positions:</strong> For point features, the upper-right position is preferred, then lower-right, upper-left, and lower-left. Never centre a label on its point.</li>
+        <li><strong>Priority 2 — Conflict avoidance:</strong> A label must not overlap its anchor marker, other labels, or map edges. Increase the offset until conflicts resolve.</li>
+        <li><strong>Priority 3 — Leader lines:</strong> If a label is displaced far from its marker (e.g., in dense areas), draw a thin leader line connecting the two.</li>
+        <li><strong>Priority 4 — Legibility:</strong> Use a contrasting halo (text shadow or white outline) so labels read over both light and dark basemap tiles. Font size ≥ 11px for primary labels.</li>
+        <li><strong>Priority 5 — Hierarchy:</strong> More important features get larger, bolder labels. Suppress less important labels before allowing overlap.</li>
+      </ul>
+      <div class="formula">Optimal position = argmin { overlap_penalty + distance_from_preferred_position }</div>
+    </div>
+
+    <!-- Reference map showing sample data -->
+    <div class="fig-wrap">
+      <div class="map-label">📍 Reference Map — Taxi Pickup Points (Sample, April 5, 2016)</div>
+      <div id="ref-map" style="height:380px;border-radius:0 0 8px 8px"></div>
+      <div class="fig-caption">Fig 5 — Sample of taxi pickup locations from the provided dataset rendered on OpenStreetMap. The full dataset contains ~6,000 trips recorded on April 5, 2016. Manhattan and surrounding boroughs are clearly the dominant pickup zones. Use this as a reference when building your labeled map.</div>
+    </div>
+
+    <!-- Label placement illustration -->
+    <div class="fig-wrap">
+      <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px">
+        <!-- Background -->
+        <rect width="600" height="200" fill="#F0F4F8" rx="8"/>
+        <!-- Title -->
+        <text x="300" y="22" font-size="11" fill="#64748B" text-anchor="middle" font-weight="600" font-family="Segoe UI, sans-serif">Label Placement Priority Positions (for a point marker)</text>
+
+        <!-- Centre marker -->
+        <circle cx="300" cy="108" r="7" fill="#1A2E4A" stroke="#fff" stroke-width="2"/>
+        <circle cx="300" cy="108" r="3" fill="#fff"/>
+
+        <!-- Priority 1: Upper-right -->
+        <rect x="316" y="72" width="88" height="22" rx="4" fill="#0F6B6B" opacity="0.9"/>
+        <text x="360" y="87" font-size="10" fill="#fff" text-anchor="middle" font-family="Segoe UI, sans-serif" font-weight="700">① Upper-Right ★</text>
+        <line x1="305" y1="103" x2="316" y2="88" stroke="#0F6B6B" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- Priority 2: Lower-right -->
+        <rect x="316" y="130" width="88" height="22" rx="4" fill="#1A4060" opacity="0.8"/>
+        <text x="360" y="145" font-size="10" fill="#fff" text-anchor="middle" font-family="Segoe UI, sans-serif">② Lower-Right</text>
+        <line x1="305" y1="113" x2="316" y2="130" stroke="#1A4060" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- Priority 3: Upper-left -->
+        <rect x="196" y="72" width="88" height="22" rx="4" fill="#475569" opacity="0.8"/>
+        <text x="240" y="87" font-size="10" fill="#fff" text-anchor="middle" font-family="Segoe UI, sans-serif">③ Upper-Left</text>
+        <line x1="295" y1="103" x2="284" y2="88" stroke="#475569" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- Priority 4: Lower-left -->
+        <rect x="196" y="130" width="88" height="22" rx="4" fill="#64748B" opacity="0.7"/>
+        <text x="240" y="145" font-size="10" fill="#fff" text-anchor="middle" font-family="Segoe UI, sans-serif">④ Lower-Left</text>
+        <line x1="295" y1="113" x2="284" y2="130" stroke="#64748B" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- Conflict example -->
+        <rect x="60" y="80" width="80" height="20" rx="4" fill="#991B1B" opacity="0.15" stroke="#991B1B" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="100" y="94" font-size="9" fill="#991B1B" text-anchor="middle" font-family="Segoe UI, sans-serif">CONFLICT ✗</text>
+
+        <!-- Leader line example -->
+        <circle cx="490" cy="108" r="7" fill="#B45309" stroke="#fff" stroke-width="2"/>
+        <rect x="490" y="50" width="95" height="22" rx="4" fill="#B45309" opacity="0.9"/>
+        <text x="538" y="65" font-size="10" fill="#fff" text-anchor="middle" font-family="Segoe UI, sans-serif" font-weight="700">Leader Line ★</text>
+        <line x1="490" y1="103" x2="525" y2="72" stroke="#B45309" stroke-width="1.5"/>
+        <text x="538" y="125" font-size="9" fill="#B45309" text-anchor="middle" font-family="Segoe UI, sans-serif">Used when dense</text>
+
+        <!-- Arrow indicating preferred -->
+        <text x="452" y="86" font-size="18" fill="#0F6B6B" opacity="0.5">★</text>
+      </svg>
+      <div class="fig-caption">Fig 6 — Label placement priority positions around a point marker. Upper-right (①) is always attempted first; positions ②–④ are fallbacks when conflicts arise. A leader line (right example) is used when the label must be displaced far from its anchor due to density.</div>
+    </div>
+
+    <div class="task-parts">
+      <div class="task-part">
+        <div class="part-label">Part A — Data Loading &amp; Clustering (10 pts)</div>
+        <p>Load the provided <code>NYC-5April2016-TaxiTrips.xlsx</code> file. <strong>Important:</strong> the coordinates in the Excel file are stored as integers scaled by 10<sup>15</sup> (longitude) and 10<sup>14</sup> (latitude). Divide each column by the appropriate factor to recover decimal degrees (pickup longitude should be approximately −74, pickup latitude approximately 40.7).</p>
+        <p style="margin-top:8px">Group the pickup points into <strong>grid cells</strong> of 0.01° × 0.01° (approximately 800 m × 800 m at NYC's latitude). Identify and label the <strong>top 10 cells</strong> by pickup count. These 10 cells are your label anchors. Display their centroids as circle markers, scaled by count.</p>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part B — Label Implementation (15 pts)</div>
+        <p>For each of the 10 hotspot markers, implement label placement following the priority rules described above. Your implementation must:</p>
+        <ul>
+          <li>Attempt the <strong>upper-right position first</strong> (offset: +10px x, −20px y from marker centre)</li>
+          <li>Fall back through positions ②–④ using a simple <strong>bounding-box overlap test</strong> against already-placed labels and the map edge</li>
+          <li>Draw a thin <strong>leader line</strong> (e.g., 1px, colour #666) from marker to label whenever the label is not in position ①</li>
+          <li>Apply a <strong>white text halo</strong> (CSS <code>text-shadow</code> or SVG <code>paint-order: stroke</code>) so labels read clearly over the basemap</li>
+          <li>Each label must display the <strong>rank</strong> (1–10) and <strong>pickup count</strong> (e.g., "3 · 47 trips")</li>
+        </ul>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part C — Written Reflection (10 pts)</div>
+        <p>In 100–200 words per question, answer both of the following:</p>
+        <ul>
+          <li><strong>C1 —</strong> Zoom in on Manhattan. At zoom level 14, do any of your top-10 labels overlap? At zoom level 12? Describe how your placement algorithm responds to zoom changes and what additional strategies (label suppression, dynamic font scaling) would improve legibility at lower zoom levels.</li>
+          <li><strong>C2 —</strong> The OpenStreetMap basemap already carries its own labels (street names, POI names). How does the <em>figure-ground</em> relationship between your overlay labels and the basemap labels affect readability? What visual variables (colour, weight, size, halo thickness) would you adjust to create a clear visual hierarchy between the two label layers?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Starter code -->
+    <div class="code-label">💻 Starter Code — Leaflet Map with OpenStreetMap</div>
+    <div class="code-block">
+<pre><span class="cm">/* ── 1. Set up Leaflet map ─────────────────────────────────────── */</span>
+<span class="kw">const</span> map = L.<span class="fn">map</span>(<span class="str">'map-container'</span>).<span class="fn">setView</span>([40.75, -73.97], 12);
+
+L.tileLayer(<span class="str">'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'</span>, {
+  attribution: <span class="str">'© OpenStreetMap contributors'</span>,
+  maxZoom: 19
+}).<span class="fn">addTo</span>(map);
+
+<span class="cm">/* ── 2. Parse and scale coordinates ───────────────────────────── */</span>
+<span class="kw">function</span> <span class="fn">parseTrips</span>(rawData) {
+  <span class="kw">return</span> rawData.<span class="fn">map</span>(row => ({
+    lat: row.pickup_latitude / 1e14,   <span class="cm">// ÷ 10^14</span>
+    lon: row.pickup_longitude / 1e15,  <span class="cm">// ÷ 10^15</span>
+  })).<span class="fn">filter</span>(p =>
+    p.lat > 40.4 && p.lat < 40.95 &&
+    p.lon > -74.3 && p.lon < -73.5
+  );
+}
+
+<span class="cm">/* ── 3. Grid-based clustering (0.01° × 0.01° cells) ──────────── */</span>
+<span class="kw">function</span> <span class="fn">clusterToGrid</span>(points, cellSize = 0.01) {
+  <span class="kw">const</span> grid = <span class="kw">new</span> Map();
+  points.<span class="fn">forEach</span>(p => {
+    <span class="kw">const</span> key = `${Math.floor(p.lat / cellSize)},${Math.floor(p.lon / cellSize)}`;
+    <span class="kw">const</span> cell = grid.<span class="fn">get</span>(key) || { count: 0, lat: p.lat, lon: p.lon };
+    cell.count++;
+    grid.<span class="fn">set</span>(key, cell);
+  });
+  <span class="kw">return</span> [...grid.<span class="fn">values</span>()].<span class="fn">sort</span>((a, b) => b.count - a.count).<span class="fn">slice</span>(0, 10);
+}
+
+<span class="cm">/* ── 4. Label placement with priority positions ───────────────── */</span>
+<span class="kw">const</span> POSITIONS = [
+  { dx: 10, dy: -20, anchor: <span class="str">'start'</span>  },  <span class="cm">// ① upper-right (preferred)</span>
+  { dx: 10, dy:  18, anchor: <span class="str">'start'</span>  },  <span class="cm">// ② lower-right</span>
+  { dx:-10, dy: -20, anchor: <span class="str">'end'</span>    },  <span class="cm">// ③ upper-left</span>
+  { dx:-10, dy:  18, anchor: <span class="str">'end'</span>    },  <span class="cm">// ④ lower-left</span>
+];
+
+<span class="kw">const</span> placed = [];   <span class="cm">// tracks already-placed label bounding boxes</span>
+
+<span class="kw">function</span> <span class="fn">placeLabel</span>(markerPx, labelText, svgLayer) {
+  <span class="kw">for</span> (<span class="kw">const</span> pos <span class="kw">of</span> POSITIONS) {
+    <span class="kw">const</span> bbox = { x: markerPx.x + pos.dx, y: markerPx.y + pos.dy,
+                   w: labelText.length * 6.5, h: 16 };
+    <span class="kw">if</span> (!<span class="fn">overlaps</span>(bbox, placed)) {
+      placed.<span class="fn">push</span>(bbox);
+      <span class="cm">// draw label + leader line to markerPx if not position ①</span>
+      <span class="kw">return</span> pos;
+    }
+  }
+  <span class="kw">return</span> POSITIONS[0]; <span class="cm">// fallback: use ① even if overlap</span>
+}
+
+<span class="kw">function</span> <span class="fn">overlaps</span>(a, placed) {
+  <span class="kw">return</span> placed.<span class="fn">some</span>(b =>
+    a.x < b.x + b.w && a.x + a.w > b.x &&
+    a.y < b.y + b.h && a.y + a.h > b.y
+  );
+}</pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body"><strong>Note on coordinate scaling:</strong> The Excel file stores coordinates as large integers. Row inspection shows <code>pickup_longitude ≈ −7.398 × 10¹⁶</code> and <code>pickup_latitude ≈ 4.076 × 10¹⁵</code>. Dividing by 10¹⁵ and 10¹⁴ respectively recovers the decimal degrees. After filtering to the NYC bounding box (40.4°–40.95°N, 74.3°–73.5°W) you should have approximately 159 trips available for the sample provided. Verify your coordinates by checking that they cluster in Manhattan and surrounding boroughs.</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  TASK 3 — KERNEL DENSITY                                       -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="task3">
+<div class="section-divider">
+  <div class="sec-label">Task 3 of 3</div>
+  <h2>🔥 Kernel Density Estimation</h2>
+  <p>Reveal the continuous spatial intensity of taxi pickups using kernel density estimation (KDE), rendered as a smooth heatmap layer over OpenStreetMap.</p>
+  <div class="sec-chips">
+    <span class="sec-chip code-chip">💻 Coded — JavaScript / Leaflet.heat</span>
+    <span class="sec-chip">35 points</span>
+    <span class="sec-chip">OpenStreetMap API</span>
+    <span class="sec-chip">⏱ ~60 min</span>
+  </div>
+</div>
+
+<div class="task-card">
+  <div class="t-header">
+    <div class="t-num amber">T3</div>
+    <div class="t-meta">
+      <h3>Pickup Density as a Continuous Field — KDE Heatmap</h3>
+      <div class="t-tags">
+        <span class="tag code">💻 Coded</span>
+        <span class="tag pts">35 pts</span>
+        <span class="tag data">NYC Taxi data</span>
+        <span class="tag">Leaflet.heat</span>
+      </div>
+    </div>
+  </div>
+  <div class="t-body">
+
+    <div class="theory-box">
+      <div class="theory-label">📊 Background — Kernel Density Estimation</div>
+      <p>A raw scatter of point markers tells you <em>where</em> events occurred but obscures <em>how intensely</em>. Kernel density estimation (KDE) converts a discrete point set into a continuous density surface by placing a <strong>kernel function</strong> — a smooth bump — on each point and summing all the bumps:</p>
+      <div class="formula">f̂(x) = (1 / n·h²) · Σᵢ K((x − xᵢ) / h)</div>
+      <p>where <strong>n</strong> is the number of points, <strong>h</strong> is the bandwidth (smoothing parameter), and <strong>K</strong> is the kernel (typically a Gaussian or Epanechnikov function). The result is a smooth field where high values indicate regions of intense activity.</p>
+      <ul>
+        <li><strong>Small bandwidth h:</strong> Noisy surface that closely follows individual points. Good for detecting tight clusters.</li>
+        <li><strong>Large bandwidth h:</strong> Highly smoothed surface that shows broad regional trends. Individual hotspots merge.</li>
+        <li><strong>Optimal bandwidth (Silverman's rule):</strong> h ≈ 1.06 · σ · n<sup>−1/5</sup>, where σ is the standard deviation of point coordinates.</li>
+      </ul>
+      <p style="margin-top:8px">In Leaflet, the <strong>leaflet-heat</strong> plugin computes a fast approximation of Gaussian KDE directly in the browser using canvas. Its <code>radius</code> parameter corresponds to the kernel bandwidth in screen pixels.</p>
+    </div>
+
+    <!-- KDE bandwidth illustration -->
+    <div class="fig-wrap">
+      <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px">
+        <rect width="600" height="200" fill="#F8FAFC" rx="8"/>
+        <text x="300" y="20" font-size="11" fill="#64748B" text-anchor="middle" font-weight="600" font-family="Segoe UI, sans-serif">KDE Bandwidth Effect on Density Surface</text>
+
+        <!-- Small bandwidth -->
+        <g transform="translate(20, 30)">
+          <rect width="170" height="160" fill="#EFF6FF" rx="6" stroke="#BFDBFE" stroke-width="1"/>
+          <text x="85" y="16" font-size="9" fill="#1E40AF" text-anchor="middle" font-weight="700" font-family="Segoe UI, sans-serif">h = SMALL (under-smooth)</text>
+          <!-- Spiky density curves -->
+          <polyline points="10,140 30,130 40,60 50,130 70,125 80,55 90,125 110,120 120,50 130,120 150,130 160,140" fill="none" stroke="#3B82F6" stroke-width="2"/>
+          <polyline points="10,140 30,130 40,60 50,130 70,125 80,55 90,125 110,120 120,50 130,120 150,130 160,140" fill="rgba(59,130,246,0.1)"/>
+          <!-- Points -->
+          <circle cx="40" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="80" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="120" cy="145" r="3" fill="#1A2E4A"/>
+          <text x="85" y="158" font-size="8" fill="#64748B" text-anchor="middle" font-style="italic" font-family="Segoe UI, sans-serif">Noisy — reveals fine structure</text>
+        </g>
+
+        <!-- Optimal bandwidth -->
+        <g transform="translate(215, 30)">
+          <rect width="170" height="160" fill="#F0FDF4" rx="6" stroke="#BBF7D0" stroke-width="1"/>
+          <text x="85" y="16" font-size="9" fill="#14532D" text-anchor="middle" font-weight="700" font-family="Segoe UI, sans-serif">h = OPTIMAL (Silverman)</text>
+          <!-- Smooth curves with two peaks -->
+          <path d="M10,140 C30,138 40,90 65,60 C80,45 100,45 115,60 C140,90 150,138 160,140" fill="rgba(34,197,94,0.15)" stroke="#16A34A" stroke-width="2"/>
+          <circle cx="40" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="80" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="120" cy="145" r="3" fill="#1A2E4A"/>
+          <text x="85" y="158" font-size="8" fill="#64748B" text-anchor="middle" font-style="italic" font-family="Segoe UI, sans-serif">Balanced — recommended</text>
+        </g>
+
+        <!-- Large bandwidth -->
+        <g transform="translate(410, 30)">
+          <rect width="170" height="160" fill="#FFF7ED" rx="6" stroke="#FED7AA" stroke-width="1"/>
+          <text x="85" y="16" font-size="9" fill="#9A3412" text-anchor="middle" font-weight="700" font-family="Segoe UI, sans-serif">h = LARGE (over-smooth)</text>
+          <!-- Very smooth flat curve -->
+          <path d="M10,140 C40,125 80,80 85,75 C90,80 130,125 160,140" fill="rgba(249,115,22,0.15)" stroke="#EA580C" stroke-width="2"/>
+          <circle cx="40" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="80" cy="145" r="3" fill="#1A2E4A"/>
+          <circle cx="120" cy="145" r="3" fill="#1A2E4A"/>
+          <text x="85" y="158" font-size="8" fill="#64748B" text-anchor="middle" font-style="italic" font-family="Segoe UI, sans-serif">Over-smoothed — hides hotspots</text>
+        </g>
+
+        <!-- Axis labels -->
+        <text x="105" y="196" font-size="8" fill="#94A3B8" text-anchor="middle" font-family="Segoe UI, sans-serif">Space →</text>
+        <text x="300" y="196" font-size="8" fill="#94A3B8" text-anchor="middle" font-family="Segoe UI, sans-serif">Space →</text>
+        <text x="495" y="196" font-size="8" fill="#94A3B8" text-anchor="middle" font-family="Segoe UI, sans-serif">Space →</text>
+      </svg>
+      <div class="fig-caption">Fig 7 — Effect of bandwidth <em>h</em> on the KDE surface. Left: too small — individual points dominate. Centre: optimal (Silverman's rule) — smooth yet preserves structure. Right: too large — hotspots merge into one amorphous blob. For the heatmap, start with Leaflet's <code>radius: 20</code> and adjust to your data density.</div>
+    </div>
+
+    <!-- Live demo KDE map -->
+    <div class="fig-wrap" style="padding:0;overflow:hidden">
+      <div class="map-label">🔥 Demo — KDE Heatmap of Taxi Pickups (Leaflet.heat, April 5, 2016)</div>
+      <div id="kde-map" style="height:420px"></div>
+      <div class="fig-caption" style="padding:10px 16px">Fig 8 — Live KDE heatmap generated from the provided sample data using Leaflet.heat. Hot colours (red/orange) indicate high pickup density; cool colours (blue/green) indicate low density. Notice the concentration in Midtown Manhattan and the airport cluster (lower-right). Your implementation should replicate and extend this with the full dataset.</div>
+    </div>
+
+    <div class="task-parts">
+      <div class="task-part">
+        <div class="part-label">Part A — Full Dataset KDE (15 pts)</div>
+        <p>Using the complete <code>NYC-5April2016-TaxiTrips.xlsx</code>, load all valid pickup coordinates and render a <strong>Leaflet.heat</strong> layer. Configure the plugin with:</p>
+        <ul>
+          <li><code>radius</code>: start at 20 pixels — the effective kernel bandwidth at the default zoom level</li>
+          <li><code>blur</code>: set to 15 pixels (Gaussian blur applied to the canvas layer)</li>
+          <li><code>maxZoom</code>: 18 (disable point merging at street level)</li>
+          <li><code>gradient</code>: define a custom colour ramp using at least 5 stops, e.g., <code>{0.0:'#001F4E', 0.3:'#006994', 0.5:'#F7C948', 0.8:'#F4721B', 1.0:'#B22222'}</code></li>
+        </ul>
+        <p style="margin-top:8px">Include a legend showing the colour ramp and the range (min / max trips per km²) with a note on how you estimated the scale.</p>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part B — Bandwidth Sensitivity Analysis (10 pts)</div>
+        <p>Add a <strong>slider control</strong> to your map (HTML <code>&lt;input type="range"&gt;</code>) that dynamically adjusts the <code>radius</code> parameter from 5 to 60 pixels in steps of 5. When the slider changes, remove and re-add the heat layer with the new radius. Include a readout showing the current radius value in pixels and the approximate ground distance it represents at the default zoom level (hint: at Leaflet zoom 12, 1 pixel ≈ 38 metres).</p>
+        <p style="margin-top:8px">Report in your HTML: which radius value best reveals the pickup hotspots without over-smoothing? Justify with a brief (≤ 80 word) explanation.</p>
+      </div>
+
+      <div class="task-part">
+        <div class="part-label">Part C — Temporal Slicing (10 pts)</div>
+        <p>The dataset includes <code>pickup_datetime</code>. Add a <strong>time-of-day filter</strong> with buttons or a dropdown for three time windows:</p>
+        <ul>
+          <li>🌅 Morning rush: 07:00 – 09:59</li>
+          <li>☀️ Midday: 12:00 – 14:59</li>
+          <li>🌙 Evening: 18:00 – 21:59</li>
+        </ul>
+        <p style="margin-top:8px">When a time window is selected, recompute the heatmap using only pickups within that window. Briefly describe (≤ 100 words) how the spatial pattern of pickups changes across the three time windows.</p>
+      </div>
+    </div>
+
+    <!-- Starter code KDE -->
+    <div class="code-label">💻 Starter Code — Leaflet.heat Setup</div>
+    <div class="code-block">
+<pre><span class="cm">/* ── Include in your HTML <head> ──────────────────────────────── */</span>
+<span class="cm">// &lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/&gt;</span>
+<span class="cm">// &lt;script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"&gt;&lt;/script&gt;</span>
+<span class="cm">// &lt;script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"&gt;&lt;/script&gt;</span>
+
+<span class="cm">/* ── Map initialisation ───────────────────────────────────────── */</span>
+<span class="kw">const</span> map = L.<span class="fn">map</span>(<span class="str">'map-container'</span>).<span class="fn">setView</span>([40.75, -73.97], 12);
+L.<span class="fn">tileLayer</span>(<span class="str">'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'</span>, {
+  attribution: <span class="str">'© OpenStreetMap contributors'</span>
+}).<span class="fn">addTo</span>(map);
+
+<span class="cm">/* ── Convert trip data to [lat, lng, intensity] format ────────── */</span>
+<span class="kw">const</span> heatData = trips.<span class="fn">map</span>(t => [t.lat, t.lon, 1]);
+
+<span class="cm">/* ── Create heat layer ────────────────────────────────────────── */</span>
+<span class="kw">let</span> heatLayer = L.<span class="fn">heatLayer</span>(heatData, {
+  radius:  20,        <span class="cm">// kernel bandwidth in px — tune this</span>
+  blur:    15,        <span class="cm">// Gaussian blur in px</span>
+  maxZoom: 18,
+  gradient: {         <span class="cm">// custom colour ramp</span>
+    0.0: <span class="str">'#001F4E'</span>,
+    0.3: <span class="str">'#006994'</span>,
+    0.5: <span class="str">'#F7C948'</span>,
+    0.8: <span class="str">'#F4721B'</span>,
+    1.0: <span class="str">'#B22222'</span>
+  }
+}).<span class="fn">addTo</span>(map);
+
+<span class="cm">/* ── Bandwidth slider ─────────────────────────────────────────── */</span>
+<span class="kw">const</span> slider = document.<span class="fn">getElementById</span>(<span class="str">'radius-slider'</span>);
+slider.<span class="fn">addEventListener</span>(<span class="str">'input'</span>, () => {
+  map.<span class="fn">removeLayer</span>(heatLayer);
+  heatLayer = L.<span class="fn">heatLayer</span>(heatData, {
+    radius: +slider.value,
+    blur: 15, maxZoom: 18
+  }).<span class="fn">addTo</span>(map);
+  document.<span class="fn">getElementById</span>(<span class="str">'radius-val'</span>).textContent =
+    `${slider.value}px ≈ ${(+slider.value * 38).toFixed(0)}m at zoom 12`;
+});
+
+<span class="cm">/* ── Temporal filter ──────────────────────────────────────────── */</span>
+<span class="kw">function</span> <span class="fn">filterByHour</span>(trips, startH, endH) {
+  <span class="kw">return</span> trips.<span class="fn">filter</span>(t => {
+    <span class="kw">const</span> h = <span class="kw">new</span> <span class="fn">Date</span>(t.pickup_datetime).<span class="fn">getHours</span>();
+    <span class="kw">return</span> h >= startH && h <= endH;
+  });
+}</pre>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body"><strong>Tip — Silverman's Rule for Bandwidth:</strong> Compute the standard deviation of your pickup latitudes (σ_lat) and longitudes (σ_lon). Convert degrees to metres (1° ≈ 111 km). Then h ≈ 1.06 × σ (metres) × n<sup>−0.2</sup>. Convert back to pixels at the current zoom level. This gives a principled starting point before manual tuning.</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  RUBRIC & SUBMISSION                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="rubric">
+<div class="section-divider">
+  <div class="sec-label">Grading</div>
+  <h2>📋 Rubric &amp; Submission Guidelines</h2>
+  <p>Your report will be graded on correctness, visual quality, and written reflection. All three tasks contribute equally to the grade.</p>
+  <div class="sec-chips">
+    <span class="sec-chip">100 total points</span>
+    <span class="sec-chip">HTML format</span>
+    <span class="sec-chip">Individual work</span>
+  </div>
+</div>
+
+<div class="task-card">
+  <div class="t-header">
+    <div class="t-num navy">✓</div>
+    <div class="t-meta">
+      <h3>Full Grading Rubric</h3>
+      <div class="t-tags">
+        <span class="tag">100 pts total</span>
+        <span class="tag pts">T1: 30 · T2: 35 · T3: 35</span>
+      </div>
+    </div>
+  </div>
+  <div class="t-body">
+
+    <p style="font-size:14px;color:#334155;margin-bottom:16px">Each criterion is graded on a 0–full-marks scale. Partial credit is given for partially correct answers. Clear code comments and well-written reflections will be rewarded.</p>
+
+    <table class="rubric-table">
+      <thead>
+        <tr>
+          <th style="width:8%">Task</th>
+          <th style="width:8%">Part</th>
+          <th>Criterion</th>
+          <th style="width:12%" class="pts-col">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td rowspan="4"><strong>T1</strong><br><em>30 pts</em></td>
+            <td>A</td>
+            <td>Graticule sketches for both projections are geometrically accurate; axes labelled with degree values; projection names noted</td>
+            <td class="pts-col">12</td></tr>
+        <tr><td>B</td>
+            <td>Tissot indicatrices placed at correct locations; sizes proportional to scale factors; shape differences (round vs elliptical) annotated</td>
+            <td class="pts-col">8</td></tr>
+        <tr><td>C</td>
+            <td>Written analysis addresses both scenarios (web map and printed choropleth); reasoning references area distortion, tile efficiency, and user context</td>
+            <td class="pts-col">6</td></tr>
+        <tr><td>D</td>
+            <td>Correct identification of both mystery projections with valid graticule clues cited</td>
+            <td class="pts-col">4</td></tr>
+
+        <tr style="background:#F0FDF4"><td rowspan="3"><strong>T2</strong><br><em>35 pts</em></td>
+            <td>A</td>
+            <td>Coordinates correctly decoded (scaling factors applied); grid clustering produces plausible top-10 hotspots in NYC; markers scaled by count</td>
+            <td class="pts-col">10</td></tr>
+        <tr style="background:#F0FDF4"><td>B</td>
+            <td>Priority placement attempted for all 10 labels; overlap test implemented; leader lines drawn when not in position ①; white halo applied; rank and count shown</td>
+            <td class="pts-col">15</td></tr>
+        <tr style="background:#F0FDF4"><td>C</td>
+            <td>Written reflection addresses zoom-level behaviour and visual hierarchy between overlay and basemap labels; specific visual variables cited</td>
+            <td class="pts-col">10</td></tr>
+
+        <tr><td rowspan="3"><strong>T3</strong><br><em>35 pts</em></td>
+            <td>A</td>
+            <td>Heat layer renders correctly; custom 5-stop colour ramp applied; legend included with scale annotation</td>
+            <td class="pts-col">15</td></tr>
+        <tr><td>B</td>
+            <td>Slider adjusts radius dynamically; pixel-to-metre conversion displayed; optimal bandwidth identified and justified</td>
+            <td class="pts-col">10</td></tr>
+        <tr><td>C</td>
+            <td>Three time windows correctly filtered; heatmap updates on selection; spatial pattern differences described with spatial specificity</td>
+            <td class="pts-col">10</td></tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:#F8FAFC">
+          <td colspan="3" style="text-align:right;font-weight:700;color:#1E293B;padding:10px 14px">Total</td>
+          <td class="pts-col" style="font-size:16px;font-weight:900;color:var(--navy)">100</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="submit-box" style="margin-top:24px">
+      <h4>📦 Submission Checklist</h4>
+      <ul>
+        <li>One self-contained <strong>HTML file</strong> with all JavaScript inline (no external scripts except CDN links for Leaflet)</li>
+        <li>Your <strong>scanned/photographed sketches</strong> from Task 1 embedded as <code>&lt;img&gt;</code> tags (JPEG or PNG, ≤ 2 MB each)</li>
+        <li>All <strong>written reflections</strong> for Tasks 1C, 1D, 2C, 3B, and 3C included in the HTML</li>
+        <li>Your <strong>full name and student ID</strong> in the HTML <code>&lt;title&gt;</code> tag and at the top of the page body</li>
+        <li>Filename format: <code>DSA301_P3_&lt;StudentID&gt;_&lt;Surname&gt;.html</code></li>
+        <li>Submit via <strong>SuCourse</strong> before the deadline — late submissions lose 10 pts per day</li>
+      </ul>
+    </div>
+
+    <div class="callout info" style="margin-top:16px">
+      <span class="callout-icon">ℹ️</span>
+      <div class="callout-body"><strong>Academic integrity:</strong> This is an individual project. You may discuss concepts with classmates but all code and written analysis must be your own. Cite any external resources (Stack Overflow, tutorials) you used in a comment at the top of your HTML file. Use of AI code assistants is permitted for syntax help only — any AI-generated analysis text must be rewritten in your own words.</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+</main>
+
+<!-- ─── FOOTER ────────────────────────────────────────────────────── -->
+<div id="footer">
+  DSA 301 Data Visualization &nbsp;·&nbsp; Project 3 — Map Visualizations &nbsp;·&nbsp; NYC Taxi Dataset, April 5 2016
+</div>
+
+<button id="menu-toggle" onclick="toggleSidebar()">☰</button>
+
+<!-- ─── SCRIPTS ───────────────────────────────────────────────────── -->
+<script>
+// ── NAVIGATION ─────────────────────────────────────────────────────
+function navTo(id){
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if(b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+id+"'"))
+      b.classList.add('active');
+  });
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// Scrollspy
+const secIds = ['cover','task1','task2','task3','rubric'];
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const id = e.target.id;
+      document.querySelectorAll('.nav-item').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+id+"'"));
+      });
+    }
+  });
+},{threshold:0.15, rootMargin:'-5% 0px -60% 0px'});
+secIds.forEach(id => { const el = document.getElementById(id); if(el) obs.observe(el); });
+
+// ── TAXI SAMPLE DATA (159 valid points from April 5, 2016) ─────────
+const SAMPLE_POINTS = [[40.76276,-73.98214],[40.73346,-74.0023],[40.77411,-73.87306],[40.77411,-73.8729],[40.74994,-73.97253],[40.76215,-73.96215],[40.75616,-73.99035],[40.76532,-73.97652],[40.76532,-73.95814],[40.75177,-73.98805],[40.77631,-73.95585],[40.80475,-73.94786],[40.78412,-73.97382],[40.78802,-73.97098],[40.64471,-73.78197],[40.7652,-73.96201],[40.76141,-73.99404],[40.74652,-73.97215],[40.77399,-73.87285],[40.75165,-73.97074],[40.76752,-73.9623],[40.73724,-73.99272],[40.76678,-73.98238],[40.74579,-73.98213],[40.77045,-73.9818],[40.71478,-74.01604],[40.74213,-73.9078],[40.74713,-74.00139],[40.74591,-73.97189],[40.70905,-74.00206],[40.75348,-73.97258],[40.74176,-74.00101],[40.75177,-73.99004],[40.75177,-73.981],[40.73297,-74.00019],[40.73346,-73.9997],[40.75592,-73.97917],[40.74469,-73.97598],[40.64862,-73.78372],[40.71588,-74.00266],[40.75653,-73.98971],[40.76825,-73.98206],[40.7536,-73.97388],[40.73138,-73.98246],[40.74042,-73.98631],[40.73358,-73.98759],[40.74298,-74.00024],[40.75104,-73.99374],[40.64484,-73.78213],[40.72821,-73.98205],[40.77985,-73.95577],[40.64496,-73.79158],[40.76581,-73.96349],[40.74335,-73.99621],[40.79535,-73.97129],[40.78973,-73.9662],[40.75299,-73.98527],[40.76471,-73.97279],[40.75323,-73.97472],[40.77679,-73.94917],[40.75519,-73.9754],[40.75763,-73.97581],[40.77704,-73.95992],[40.76141,-73.97922],[40.72711,-73.99975],[40.77435,-73.87325],[40.76129,-73.97297],[40.70514,-74.00521],[40.76495,-73.9819],[40.75043,-73.9877],[40.76788,-73.9896],[40.72015,-73.97871],[40.75616,-73.97915],[40.77875,-73.98222],[40.73065,-73.98069],[40.77533,-73.95584],[40.75885,-73.97465],[40.73224,-73.98483],[40.78119,-73.95437],[40.75238,-73.98576],[40.76703,-73.9828],[40.77875,-73.95835],[40.80182,-73.95723],[40.7265,-73.98608],[40.75214,-73.98995],[40.64374,-73.79007],[40.75214,-74.00462],[40.76434,-73.98052],[40.74933,-74.0028],[40.76471,-73.96822],[40.78278,-73.94819],[40.75922,-73.98161],[40.77423,-73.95698],[40.7558,-73.99101],[40.80756,-73.92701],[40.74982,-73.9749],[40.77362,-73.95565],[40.74054,-74.00185],[40.64447,-73.78271],[40.76166,-73.96205],[40.76007,-73.97419],[40.75641,-73.975],[40.7475,-74.00804],[40.76837,-73.98207],[40.80536,-73.96605],[40.75934,-73.9725],[40.75934,-73.97261],[40.7641,-73.98251],[40.71991,-74.00843],[40.73175,-73.97422],[40.74017,-74.00536],[40.75763,-73.96217],[40.74139,-73.97519],[40.72467,-73.99556],[40.7453,-74.00583],[40.78741,-73.96807],[40.76056,-73.97213],[40.77924,-73.95095],[40.75494,-73.99248],[40.72345,-74.00317],[40.72382,-73.99266],[40.78607,-73.97813],[40.74774,-74.0044],[40.75885,-73.96127],[40.72479,-73.99406],[40.70343,-74.01009],[40.72504,-73.99216],[40.75153,-73.98235],[40.75421,-73.96577],[40.72101,-74.00078],[40.76703,-73.98351],[40.76764,-73.98192],[40.69183,-73.98251],[40.74249,-73.98256],[40.80658,-73.96482],[40.77179,-73.9827],[40.75018,-73.99393],[40.75946,-73.98809],[40.72577,-73.99204],[40.76166,-73.98827],[40.77301,-73.98232],[40.71808,-73.99083],[40.73517,-74.00606],[40.71991,-73.99184],[40.70819,-74.0033],[40.77203,-73.98648],[40.76215,-73.97929],[40.7381,-73.98369],[40.77411,-73.8729],[40.75922,-73.97875],[40.76276,-73.97869],[40.7641,-73.98463],[40.77411,-73.87326],[40.74615,-73.99419],[40.7746,-73.96385],[40.74359,-73.98374],[40.73822,-73.9887],[40.7337,-73.98715],[40.75885,-73.9995]];
+
+// ── REFERENCE MAP (Task 2 context) ─────────────────────────────────
+(function(){
+  const refMap = L.map('ref-map', {scrollWheelZoom: false}).setView([40.745, -73.97], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(refMap);
+
+  SAMPLE_POINTS.forEach(([lat, lon]) => {
+    L.circleMarker([lat, lon], {
+      radius: 5, color: '#0F6B6B', fillColor: '#0F6B6B',
+      fillOpacity: 0.55, weight: 1
+    }).addTo(refMap);
+  });
+
+  // Add a label example
+  L.marker([40.758, -73.985], {
+    icon: L.divIcon({
+      className: '',
+      html: `<div style="background:#1A2E4A;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3)">Midtown Manhattan</div>`,
+      iconAnchor: [-4, 8]
+    })
+  }).addTo(refMap);
+
+  L.marker([40.645, -73.783], {
+    icon: L.divIcon({
+      className: '',
+      html: `<div style="background:#B45309;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3)">JFK area</div>`,
+      iconAnchor: [-4, 8]
+    })
+  }).addTo(refMap);
+})();
+
+// ── KDE DEMO MAP (Task 3) ──────────────────────────────────────────
+(function(){
+  const kdeMap = L.map('kde-map', {scrollWheelZoom: false}).setView([40.745, -73.97], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(kdeMap);
+
+  const heatData = SAMPLE_POINTS.map(([lat, lon]) => [lat, lon, 1]);
+
+  if (typeof L.heatLayer === 'function') {
+    L.heatLayer(heatData, {
+      radius: 28,
+      blur: 18,
+      maxZoom: 18,
+      gradient: { 0.0:'#001F4E', 0.3:'#006994', 0.5:'#F7C948', 0.8:'#F4721B', 1.0:'#B22222' }
+    }).addTo(kdeMap);
+  } else {
+    // Fallback if heat plugin not loaded
+    heatData.forEach(([lat, lon]) => {
+      L.circleMarker([lat, lon], {
+        radius: 8, color: '#F4721B', fillColor: '#B22222',
+        fillOpacity: 0.4, weight: 0
+      }).addTo(kdeMap);
+    });
+  }
+
+  // Legend
+  const legend = L.control({position: 'bottomright'});
+  legend.onAdd = function(){
+    const div = L.DomUtil.create('div');
+    div.innerHTML = `
+      <div style="background:rgba(255,255,255,0.92);padding:10px 14px;border-radius:8px;
+                  font-family:'Segoe UI',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
+        <div style="font-weight:700;color:#1A2E4A;margin-bottom:6px;font-size:10px;letter-spacing:.5px;text-transform:uppercase">Pickup Density</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:80px;height:10px;border-radius:5px;background:linear-gradient(to right,#001F4E,#006994,#F7C948,#F4721B,#B22222)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#64748B">
+          <span>Low</span><span>High</span>
+        </div>
+      </div>`;
+    return div;
+  };
+  legend.addTo(kdeMap);
+})();
+</script>
+</body>
+</html>
