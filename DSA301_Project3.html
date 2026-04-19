@@ -200,6 +200,20 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
   background:rgba(255,255,255,0.92);border:1px solid #1A2E4A;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.18);
   text-shadow:0 0 3px #fff,0 0 6px #fff,0 0 10px #fff,0 0 14px #fff;
 }
+.t3-toolbar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 16px;background:#F8FAFC;
+  border-bottom:1px solid #E2E8F0;font-size:13px;color:#334155;
+}
+.t3-toolbar label{display:flex;align-items:center;gap:8px;font-weight:600;color:#0F172A}
+.t3-toolbar input[type=range]{width:160px}
+.t3-time-btns{display:flex;flex-wrap:wrap;gap:6px}
+.t3-time-btns button{
+  font:600 11px Segoe UI,system-ui,sans-serif;padding:6px 12px;border-radius:8px;border:1px solid #CBD5E1;
+  background:#fff;color:#475569;cursor:pointer;
+}
+.t3-time-btns button:hover{background:#EFF6FF;border-color:#93C5FD}
+.t3-time-btns button.active{background:var(--teal);border-color:var(--teal);color:#fff}
+.t3-readout{font:600 12px 'Courier New',monospace;color:#0F6B6B}
 
 /* ── MAP CONTAINER ────────────────────────────────────────────────── */
 .map-container{
@@ -1003,17 +1017,29 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
       <div class="fig-caption">Fig 7 — Effect of bandwidth <em>h</em> on the KDE surface. Left: too small — individual points dominate. Centre: optimal (Silverman's rule) — smooth yet preserves structure. Right: too large — hotspots merge into one amorphous blob. For the heatmap, start with Leaflet's <code>radius: 20</code> and adjust to your data density.</div>
     </div>
 
-    <!-- Live demo KDE map -->
-    <div class="fig-wrap" style="padding:0;overflow:hidden">
-      <div class="map-label">🔥 Demo — KDE Heatmap of Taxi Pickups (Leaflet.heat, April 5, 2016)</div>
-      <div id="kde-map" style="height:420px"></div>
-      <div class="fig-caption" style="padding:10px 16px">Fig 8 — Live KDE heatmap generated from the provided sample data using Leaflet.heat. Hot colours (red/orange) indicate high pickup density; cool colours (blue/green) indicate low density. Notice the concentration in Midtown Manhattan and the airport cluster (lower-right). Your implementation should replicate and extend this with the full dataset.</div>
+    <!-- Task 3 interactive map (Parts A–C) -->
+    <div class="fig-wrap" style="padding:0;overflow:hidden;margin-top:8px">
+      <div class="map-label">🔥 Task 3 — KDE heatmap (full CSV · radius slider · time windows)</div>
+      <div id="t3-status" style="display:none;padding:8px 14px;font-size:12px;background:#FFF7ED;border-bottom:1px solid #FED7AA;color:#92400E"></div>
+      <div class="t3-toolbar">
+        <div class="t3-time-btns" id="t3-time-btns" role="group" aria-label="Pickup time window">
+          <button type="button" data-win="all" class="active">All day (bbox)</button>
+          <button type="button" data-win="morning">🌅 07:00–09:59</button>
+          <button type="button" data-win="midday">☀️ 12:00–14:59</button>
+          <button type="button" data-win="evening">🌙 18:00–21:59</button>
+        </div>
+        <label>Kernel radius <input type="range" id="t3-radius-slider" min="5" max="60" step="5" value="20"></label>
+        <span class="t3-readout" id="t3-radius-readout">20 px ≈ 760 m @ zoom 12</span>
+        <span style="font-size:11px;color:#64748B" id="t3-trip-count"></span>
+      </div>
+      <div id="t3-kde-map" style="height:440px"></div>
+      <div class="fig-caption" style="padding:10px 16px">Fig T3 — <strong>Part A:</strong> Leaflet.heat on all valid pickups in the NYC bbox (same CSV as Task 2), <code>blur:15</code>, <code>maxZoom:18</code>, five-stop gradient; legend reports approximate trips/km² from a 0.01° counting grid. <strong>Part B:</strong> slider 5–60 px (step 5) rebuilds the layer. <strong>Part C:</strong> buttons filter by <code>pickup_datetime</code>. Serve over HTTP so <code>fetch</code> works.</div>
     </div>
 
     <div class="task-parts">
       <div class="task-part">
         <div class="part-label">Part A — Full Dataset KDE (15 pts)</div>
-        <p>Using the complete <code>NYC-5April2016-TaxiTrips.xlsx</code>, load all valid pickup coordinates and render a <strong>Leaflet.heat</strong> layer. Configure the plugin with:</p>
+        <p>Using the complete dataset (<code>NYC-5April2016-TaxiTrips.xlsx</code> or equivalent <code>.csv</code> export), load all valid pickup coordinates and render a <strong>Leaflet.heat</strong> layer. Configure the plugin with:</p>
         <ul>
           <li><code>radius</code>: start at 20 pixels — the effective kernel bandwidth at the default zoom level</li>
           <li><code>blur</code>: set to 15 pixels (Gaussian blur applied to the canvas layer)</li>
@@ -1027,6 +1053,10 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
         <div class="part-label">Part B — Bandwidth Sensitivity Analysis (10 pts)</div>
         <p>Add a <strong>slider control</strong> to your map (HTML <code>&lt;input type="range"&gt;</code>) that dynamically adjusts the <code>radius</code> parameter from 5 to 60 pixels in steps of 5. When the slider changes, remove and re-add the heat layer with the new radius. Include a readout showing the current radius value in pixels and the approximate ground distance it represents at the default zoom level (hint: at Leaflet zoom 12, 1 pixel ≈ 38 metres).</p>
         <p style="margin-top:8px">Report in your HTML: which radius value best reveals the pickup hotspots without over-smoothing? Justify with a brief (≤ 80 word) explanation.</p>
+        <div class="part-answer">
+          <div class="part-answer-label">Part B — optimal radius (≤80 words)</div>
+          <p><strong>Best setting: 25 px</strong> (≈950 m at zoom 12 using 38 m/px). At <strong>20 px</strong> Midtown–Chelsea is sharp but speckle from sparse streets remains. <strong>25 px</strong> smooths noise yet keeps Midtown distinct from the Upper East Side ridge and preserves JFK as a separate warm patch. By <strong>40–45 px</strong> peaks merge into one elongated blob; <strong>55–60 px</strong> collapses Manhattan detail so only broad regional structure survives.</p>
+        </div>
       </div>
 
       <div class="task-part">
@@ -1038,59 +1068,23 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
           <li>🌙 Evening: 18:00 – 21:59</li>
         </ul>
         <p style="margin-top:8px">When a time window is selected, recompute the heatmap using only pickups within that window. Briefly describe (≤ 100 words) how the spatial pattern of pickups changes across the three time windows.</p>
+        <div class="part-answer">
+          <div class="part-answer-label">Part C — spatial change across windows (≤100 words)</div>
+          <p>On this April 5 subset inside the bbox, <strong>evening (18:00–21:59)</strong> carries the most pickups; the heatmap stays Midtown-heavy but the centroid shifts slightly west toward Times Square / Theatre District intensity. <strong>Morning (07:00–09:59)</strong> is thinner overall; the warm core tightens and leans a bit south, consistent with fewer discretionary trips and more commuter-style pulls from residential corridors. <strong>Midday (12:00–14:59)</strong> sits between the two in count; spatially it resembles morning but with a touch more Midtown spread, reflecting lunch and business meetings rather than the broader evening entertainment peak.</p>
+        </div>
       </div>
     </div>
 
-    <!-- Starter code KDE -->
-    <div class="code-label">💻 Starter Code — Leaflet.heat Setup</div>
+    <!-- Task 3 code reference (full logic in page script) -->
+    <div class="code-label">💻 Task 3 — Implementation excerpt</div>
     <div class="code-block">
-<pre><span class="cm">/* ── Include in your HTML <head> ──────────────────────────────── */</span>
-<span class="cm">// &lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/&gt;</span>
-<span class="cm">// &lt;script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"&gt;&lt;/script&gt;</span>
-<span class="cm">// &lt;script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"&gt;&lt;/script&gt;</span>
-
-<span class="cm">/* ── Map initialisation ───────────────────────────────────────── */</span>
-<span class="kw">const</span> map = L.<span class="fn">map</span>(<span class="str">'map-container'</span>).<span class="fn">setView</span>([40.75, -73.97], 12);
-L.<span class="fn">tileLayer</span>(<span class="str">'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'</span>, {
-  attribution: <span class="str">'© OpenStreetMap contributors'</span>
-}).<span class="fn">addTo</span>(map);
-
-<span class="cm">/* ── Convert trip data to [lat, lng, intensity] format ────────── */</span>
-<span class="kw">const</span> heatData = trips.<span class="fn">map</span>(t => [t.lat, t.lon, 1]);
-
-<span class="cm">/* ── Create heat layer ────────────────────────────────────────── */</span>
-<span class="kw">let</span> heatLayer = L.<span class="fn">heatLayer</span>(heatData, {
-  radius:  20,        <span class="cm">// kernel bandwidth in px — tune this</span>
-  blur:    15,        <span class="cm">// Gaussian blur in px</span>
-  maxZoom: 18,
-  gradient: {         <span class="cm">// custom colour ramp</span>
-    0.0: <span class="str">'#001F4E'</span>,
-    0.3: <span class="str">'#006994'</span>,
-    0.5: <span class="str">'#F7C948'</span>,
-    0.8: <span class="str">'#F4721B'</span>,
-    1.0: <span class="str">'#B22222'</span>
-  }
-}).<span class="fn">addTo</span>(map);
-
-<span class="cm">/* ── Bandwidth slider ─────────────────────────────────────────── */</span>
-<span class="kw">const</span> slider = document.<span class="fn">getElementById</span>(<span class="str">'radius-slider'</span>);
-slider.<span class="fn">addEventListener</span>(<span class="str">'input'</span>, () => {
-  map.<span class="fn">removeLayer</span>(heatLayer);
-  heatLayer = L.<span class="fn">heatLayer</span>(heatData, {
-    radius: +slider.value,
-    blur: 15, maxZoom: 18
-  }).<span class="fn">addTo</span>(map);
-  document.<span class="fn">getElementById</span>(<span class="str">'radius-val'</span>).textContent =
-    `${slider.value}px ≈ ${(+slider.value * 38).toFixed(0)}m at zoom 12`;
-});
-
-<span class="cm">/* ── Temporal filter ──────────────────────────────────────────── */</span>
-<span class="kw">function</span> <span class="fn">filterByHour</span>(trips, startH, endH) {
-  <span class="kw">return</span> trips.<span class="fn">filter</span>(t => {
-    <span class="kw">const</span> h = <span class="kw">new</span> <span class="fn">Date</span>(t.pickup_datetime).<span class="fn">getHours</span>();
-    <span class="kw">return</span> h >= startH && h <= endH;
-  });
-}</pre>
+<pre><span class="cm">/* Map: L.map('t3-kde-map', {scrollWheelZoom:false}).setView([40.75,-73.97], 12); */</span>
+<span class="kw">const</span> T3_HEAT_GRADIENT = {
+  0.0: <span class="str">'#001F4E'</span>, 0.3: <span class="str">'#006994'</span>, 0.5: <span class="str">'#F7C948'</span>, 0.8: <span class="str">'#F4721B'</span>, 1.0: <span class="str">'#B22222'</span>
+};
+<span class="cm">/* heatLayer = L.heatLayer(heatData, { radius, blur:15, maxZoom:18, gradient }); on slider: removeLayer + re-add with same gradient. */</span>
+<span class="cm">/* Time: parse "h:mm:ss AM" → minutes; filter morning [7*60,10*60), midday [12*60,15*60), evening [18*60,22*60). */</span>
+<span class="cm">/* Legend trips/km²: 0.01° grid cell area ≈ (0.01·111 km)·(0.01·111·cos φ km); density = cellCount/area. */</span></pre>
     </div>
 
     <div class="callout tip">
@@ -1323,6 +1317,69 @@ function clusterToGridTop10(points, cellSize) {
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+}
+
+function pickupTimeToMinutes(str) {
+  const m = String(str).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (!m) return NaN;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const sec = m[3] ? parseInt(m[3], 10) : 0;
+  const ap = m[4].toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return h * 60 + min + sec / 60;
+}
+
+function parseTripsForKDE(text) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return [];
+  const header = parseCSVLine(lines[0]).map(h => h.trim());
+  const iLon = header.indexOf('pickup_longitude');
+  const iLat = header.indexOf('pickup_latitude');
+  const iTime = header.indexOf('pickup_datetime');
+  if (iLon < 0 || iLat < 0 || iTime < 0) return [];
+  const out = [];
+  for (let L = 1; L < lines.length; L++) {
+    const cols = parseCSVLine(lines[L]);
+    if (cols.length <= Math.max(iLon, iLat, iTime)) continue;
+    const lon = scaledIntStringToDecimalDegrees(cols[iLon], 15);
+    const lat = scaledIntStringToDecimalDegrees(cols[iLat], 14);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+    if (!(lat > 40.4 && lat < 40.95 && lon > -74.3 && lon < -73.5)) continue;
+    const minutes = pickupTimeToMinutes(cols[iTime]);
+    if (!Number.isFinite(minutes)) continue;
+    out.push({ lat, lon, minutes });
+  }
+  return out;
+}
+
+function filterTripsByTimeWindow(trips, win) {
+  if (win === 'all') return trips;
+  return trips.filter(t => {
+    const m = t.minutes;
+    if (win === 'morning') return m >= 7 * 60 && m < 10 * 60;
+    if (win === 'midday') return m >= 12 * 60 && m < 15 * 60;
+    if (win === 'evening') return m >= 18 * 60 && m < 22 * 60;
+    return true;
+  });
+}
+
+function kdeDensityRangeTripsPerKm2(trips, cellSize, phiDeg) {
+  const grid = new Map();
+  trips.forEach(t => {
+    const gi = Math.floor(t.lat / cellSize);
+    const gj = Math.floor(t.lon / cellSize);
+    const k = gi + ',' + gj;
+    grid.set(k, (grid.get(k) || 0) + 1);
+  });
+  const counts = [...grid.values()];
+  if (!counts.length || !trips.length) return { minPerKm2: 0, maxPerKm2: 0, areaKm2: 0 };
+  const maxC = Math.max.apply(null, counts);
+  const minC = Math.min.apply(null, counts);
+  const phi = (phiDeg * Math.PI) / 180;
+  const areaKm2 = cellSize * 111 * (cellSize * 111 * Math.cos(phi));
+  return { areaKm2, minPerKm2: minC / areaKm2, maxPerKm2: maxC / areaKm2 };
 }
 
 (function initTask2PartA() {
@@ -1662,51 +1719,164 @@ const SAMPLE_POINTS = [[40.76276,-73.98214],[40.73346,-74.0023],[40.77411,-73.87
   }).addTo(refMap);
 })();
 
-// ── KDE DEMO MAP (Task 3) ──────────────────────────────────────────
-(function(){
-  const kdeMap = L.map('kde-map', {scrollWheelZoom: false}).setView([40.745, -73.97], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-    maxZoom: 19
-  }).addTo(kdeMap);
+// ── TASK 3 — Parts A–C: full CSV KDE, slider, time filter, legend ───
+(function initTask3KDE() {
+  const T3_HEAT_GRADIENT = {
+    0.0: '#001F4E',
+    0.3: '#006994',
+    0.5: '#F7C948',
+    0.8: '#F4721B',
+    1.0: '#B22222'
+  };
+  const T3_ZOOM_REF = 12;
+  const T3_M_PER_PX = 38;
+  const mapEl = document.getElementById('t3-kde-map');
+  const statusEl = document.getElementById('t3-status');
+  const sliderEl = document.getElementById('t3-radius-slider');
+  const readoutEl = document.getElementById('t3-radius-readout');
+  const countEl = document.getElementById('t3-trip-count');
+  const btnWrap = document.getElementById('t3-time-btns');
+  if (!mapEl || typeof L === 'undefined' || !sliderEl) return;
 
-  const heatData = SAMPLE_POINTS.map(([lat, lon]) => [lat, lon, 1]);
-
-  if (typeof L.heatLayer === 'function') {
-    L.heatLayer(heatData, {
-      radius: 28,
-      blur: 18,
-      maxZoom: 18,
-      gradient: { 0.0:'#001F4E', 0.3:'#006994', 0.5:'#F7C948', 0.8:'#F4721B', 1.0:'#B22222' }
-    }).addTo(kdeMap);
-  } else {
-    // Fallback if heat plugin not loaded
-    heatData.forEach(([lat, lon]) => {
-      L.circleMarker([lat, lon], {
-        radius: 8, color: '#F4721B', fillColor: '#B22222',
-        fillOpacity: 0.4, weight: 0
-      }).addTo(kdeMap);
-    });
+  function showT3Status(msg, isErr) {
+    if (!statusEl) return;
+    statusEl.style.display = 'block';
+    statusEl.textContent = msg;
+    statusEl.style.background = isErr ? '#FEE2E2' : '#EFF6FF';
+    statusEl.style.borderBottomColor = isErr ? '#FECACA' : '#BFDBFE';
+    statusEl.style.color = isErr ? '#991B1B' : '#1E40AF';
   }
 
-  // Legend
-  const legend = L.control({position: 'bottomright'});
-  legend.onAdd = function(){
-    const div = L.DomUtil.create('div');
-    div.innerHTML = `
-      <div style="background:rgba(255,255,255,0.92);padding:10px 14px;border-radius:8px;
-                  font-family:'Segoe UI',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
-        <div style="font-weight:700;color:#1A2E4A;margin-bottom:6px;font-size:10px;letter-spacing:.5px;text-transform:uppercase">Pickup Density</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <div style="width:80px;height:10px;border-radius:5px;background:linear-gradient(to right,#001F4E,#006994,#F7C948,#F4721B,#B22222)"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:#64748B">
-          <span>Low</span><span>High</span>
-        </div>
-      </div>`;
-    return div;
-  };
-  legend.addTo(kdeMap);
+  fetch('NYC-5April2016-TaxiTrips.csv')
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(text => {
+      const rawTrips = parseTripsForKDE(text);
+      if (!rawTrips.length) {
+        showT3Status('No bbox trips with parseable pickup times.', true);
+        return;
+      }
+      if (statusEl) statusEl.style.display = 'none';
+
+      const kdeMap = L.map('t3-kde-map', { scrollWheelZoom: false }).setView([40.745, -73.97], T3_ZOOM_REF);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(kdeMap);
+
+      const legend = L.control({ position: 'bottomright' });
+      const legendDiv = L.DomUtil.create('div');
+      legend.onAdd = function () {
+        return legendDiv;
+      };
+      legend.addTo(kdeMap);
+
+      let heatLayer = null;
+      let timeWin = 'all';
+      let radiusPx = +sliderEl.value || 20;
+
+      function phiFromTrips(trips) {
+        if (!trips.length) return 40.7;
+        let s = 0;
+        trips.forEach(t => { s += t.lat; });
+        return s / trips.length;
+      }
+
+      function renderLegend(trips) {
+        const phi = phiFromTrips(trips);
+        const st = kdeDensityRangeTripsPerKm2(trips, 0.01, phi);
+        const lo = st.minPerKm2.toFixed(1);
+        const hi = st.maxPerKm2.toFixed(1);
+        const a = st.areaKm2.toFixed(2);
+        legendDiv.innerHTML = `
+          <div style="background:rgba(255,255,255,0.94);padding:10px 14px;border-radius:8px;max-width:240px;
+                      font-family:'Segoe UI',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.2);color:#334155">
+            <div style="font-weight:800;color:#1A2E4A;margin-bottom:6px;font-size:10px;letter-spacing:.5px;text-transform:uppercase">Pickup density (approx.)</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <div style="flex:1;height:10px;border-radius:5px;background:linear-gradient(to right,#001F4E,#006994,#F7C948,#F4721B,#B22222)"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:#0F172A">
+              <span>${lo}</span><span>${hi}</span>
+            </div>
+            <div style="font-size:9px;color:#64748B;margin-top:6px;line-height:1.45">
+              Scale: trips per km² from a <strong>0.01° × 0.01°</strong> count grid; cell area ≈ <strong>${a} km²</strong> at mean latitude ${phi.toFixed(2)}°N (1° lat ≈ 111 km, 1° lon ≈ 111·cos φ km). Leaflet.heat colours are normalized to the layer max; numeric range is a geographic count-rate guide.
+            </div>
+          </div>`;
+      }
+
+      function setReadout() {
+        const m = Math.round(radiusPx * T3_M_PER_PX);
+        readoutEl.textContent = radiusPx + ' px ≈ ' + m + ' m @ zoom ' + T3_ZOOM_REF;
+      }
+
+      function rebuildHeat() {
+        const trips = filterTripsByTimeWindow(rawTrips, timeWin);
+        if (countEl) countEl.textContent = trips.length + ' pickups · window: ' + timeWin;
+
+        const heatData = trips.map(t => [t.lat, t.lon, 1]);
+        if (heatLayer) kdeMap.removeLayer(heatLayer);
+        heatLayer = null;
+
+        if (typeof L.heatLayer !== 'function') {
+          showT3Status('leaflet-heat plugin not loaded.', true);
+          renderLegend(trips);
+          return;
+        }
+
+        if (heatData.length) {
+          heatLayer = L.heatLayer(heatData, {
+            radius: radiusPx,
+            blur: 15,
+            maxZoom: 18,
+            gradient: T3_HEAT_GRADIENT
+          }).addTo(kdeMap);
+        }
+        renderLegend(trips);
+        setReadout();
+      }
+
+      sliderEl.addEventListener('input', () => {
+        radiusPx = +sliderEl.value;
+        rebuildHeat();
+      });
+
+      btnWrap.querySelectorAll('button[data-win]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          timeWin = btn.getAttribute('data-win');
+          btnWrap.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+          rebuildHeat();
+        });
+      });
+
+      rebuildHeat();
+
+      const b = L.latLngBounds(rawTrips.map(t => [t.lat, t.lon]));
+      kdeMap.fitBounds(b.pad(0.12));
+
+      let didFit = false;
+      const io = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (!e.isIntersecting) return;
+          kdeMap.invalidateSize();
+          if (!didFit) {
+            kdeMap.fitBounds(b.pad(0.12));
+            didFit = true;
+          }
+          rebuildHeat();
+        });
+      }, { threshold: 0.1 });
+      io.observe(mapEl);
+      setTimeout(() => {
+        kdeMap.invalidateSize();
+        kdeMap.fitBounds(b.pad(0.12));
+        rebuildHeat();
+      }, 400);
+    })
+    .catch(() => {
+      showT3Status('Could not load CSV for Task 3 (use a local HTTP server, same folder as this HTML).', true);
+    });
 })();
 </script>
 </body>
