@@ -868,77 +868,38 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
           <li><strong>C1 —</strong> Zoom in on Manhattan. At zoom level 14, do any of your top-10 labels overlap? At zoom level 12? Describe how your placement algorithm responds to zoom changes and what additional strategies (label suppression, dynamic font scaling) would improve legibility at lower zoom levels.</li>
           <li><strong>C2 —</strong> The OpenStreetMap basemap already carries its own labels (street names, POI names). How does the <em>figure-ground</em> relationship between your overlay labels and the basemap labels affect readability? What visual variables (colour, weight, size, halo thickness) would you adjust to create a clear visual hierarchy between the two label layers?</li>
         </ul>
+        <div class="part-answer">
+          <div class="part-answer-label">Part C — response (100–200 words per question)</div>
+          <p><strong>C1 — Zoom behaviour and overlaps.</strong> When I zoom to level 14 over Midtown, two or three of the top-10 hotspots can still sit close enough on screen that their pill bounding boxes touch or slightly overlap after the four-slot search, especially where neighbouring grid cells share a street canyon. At zoom 12 the same anchors occupy fewer pixels apart relative to the map width, so overlaps become a bit more likely even though the algorithm re-runs on every pan and zoom: each label is re-anchored from fresh container coordinates, overlap tests against other pills and marker footprints are recomputed, and leader lines redraw when a fallback slot is chosen. Because offsets are fixed in pixels from the marker centre, the layout scales mechanically with the map rather than adapting typography to scale. The main weakness at low zoom is that we never collide-test against basemap lettering and we never hide low-rank labels. Useful upgrades would be zoom-dependent padding or font size, suppress ranks 8–10 below a zoom threshold, and optional opacity fade so the OSM layer reads as stable ground while our overlay reads as analytic figure.</p>
+          <p><strong>C2 — Figure–ground and hierarchy.</strong> The OSM basemap already acts as a dense typographic ground—streets, parks, and POIs compete for attention. Our semi-opaque white pills with dark rims and strong halos deliberately pop forward as figure, which helps the taxi counts read quickly but can feel visually loud where the under-map is already busy; the figure-ground tension is highest where teal streets cross high-contrast halos. To sharpen hierarchy I would lighten the pill fill slightly, reduce stroke weight, and thicken the halo only where contrast drops, while lowering overall saturation so basemap browns and greys stay dominant in peripheral vision. I might also switch rank text to a slightly smaller secondary weight and reserve bold solely for the trip count. Finally, a subtle drop shadow tuned to tile luminance (not a uniform white glow) would separate overlay from basemap labels without shouting over them.</p>
+        </div>
       </div>
     </div>
 
-    <!-- Starter code -->
-    <div class="code-label">💻 Starter Code — Leaflet Map with OpenStreetMap</div>
+    <!-- Task 2: code reference aligned with this page’s implementation -->
+    <div class="code-label">💻 Task 2 — Implementation excerpt (see inline &lt;script&gt; for full code)</div>
     <div class="code-block">
-<pre><span class="cm">/* ── 1. Set up Leaflet map ─────────────────────────────────────── */</span>
-<span class="kw">const</span> map = L.<span class="fn">map</span>(<span class="str">'map-container'</span>).<span class="fn">setView</span>([40.75, -73.97], 12);
+<pre><span class="cm">/* Data: fetch NYC-5April2016-TaxiTrips.csv (Excel export). Integers use commas as thousands separators and exceed Number.MAX_SAFE_INTEGER — convert with string decimal placement, then ÷10¹⁵ (lon) / ÷10¹⁴ (lat). */</span>
 
-L.tileLayer(<span class="str">'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'</span>, {
-  attribution: <span class="str">'© OpenStreetMap contributors'</span>,
-  maxZoom: 19
-}).<span class="fn">addTo</span>(map);
+<span class="kw">function</span> <span class="fn">scaledIntStringToDecimalDegrees</span>(intStr, divisorExp) { <span class="cm">/* … */</span> }
+<span class="kw">function</span> <span class="fn">parseTripsFromCSVText</span>(text) { <span class="cm">/* quoted CSV fields → {lat,lon}[], NYC bbox filter */</span> }
 
-<span class="cm">/* ── 2. Parse and scale coordinates ───────────────────────────── */</span>
-<span class="kw">function</span> <span class="fn">parseTrips</span>(rawData) {
-  <span class="kw">return</span> rawData.<span class="fn">map</span>(row => ({
-    lat: row.pickup_latitude / 1e14,   <span class="cm">// ÷ 10^14</span>
-    lon: row.pickup_longitude / 1e15,  <span class="cm">// ÷ 10^15</span>
-  })).<span class="fn">filter</span>(p =>
-    p.lat > 40.4 && p.lat < 40.95 &&
-    p.lon > -74.3 && p.lon < -73.5
-  );
-}
+<span class="cm">/* Top-10 cells: accumulate sumLat/sumLon per key floor(lat/c)·floor(lon/c); centroid = mean; sort by count. */</span>
+<span class="kw">function</span> <span class="fn">clusterToGridTop10</span>(points, cellSize) { <span class="cm">/* … */</span> }
 
-<span class="cm">/* ── 3. Grid-based clustering (0.01° × 0.01° cells) ──────────── */</span>
-<span class="kw">function</span> <span class="fn">clusterToGrid</span>(points, cellSize = 0.01) {
-  <span class="kw">const</span> grid = <span class="kw">new</span> Map();
-  points.<span class="fn">forEach</span>(p => {
-    <span class="kw">const</span> key = `${Math.floor(p.lat / cellSize)},${Math.floor(p.lon / cellSize)}`;
-    <span class="kw">const</span> cell = grid.<span class="fn">get</span>(key) || { count: 0, lat: p.lat, lon: p.lon };
-    cell.count++;
-    grid.<span class="fn">set</span>(key, cell);
-  });
-  <span class="kw">return</span> [...grid.<span class="fn">values</span>()].<span class="fn">sort</span>((a, b) => b.count - a.count).<span class="fn">slice</span>(0, 10);
-}
-
-<span class="cm">/* ── 4. Label placement with priority positions ───────────────── */</span>
-<span class="kw">const</span> POSITIONS = [
-  { dx: 10, dy: -20, anchor: <span class="str">'start'</span>  },  <span class="cm">// ① upper-right (preferred)</span>
-  { dx: 10, dy:  18, anchor: <span class="str">'start'</span>  },  <span class="cm">// ② lower-right</span>
-  { dx:-10, dy: -20, anchor: <span class="str">'end'</span>    },  <span class="cm">// ③ upper-left</span>
-  { dx:-10, dy:  18, anchor: <span class="str">'end'</span>    },  <span class="cm">// ④ lower-left</span>
+<span class="cm">/* Part A: L.map('t2-hotspot-map'); circleMarker radius ∝ count. Part B: L.map('t2-label-map'); overlay + SVG leaders. */</span>
+<span class="kw">const</span> T2_LABEL_POSITIONS = [
+  { dx: 10, dy: -20, anchor: <span class="str">'start'</span>, slot: 1 },
+  { dx: 10, dy:  18, anchor: <span class="str">'start'</span>, slot: 2 },
+  { dx:-10, dy: -20, anchor: <span class="str">'end'</span>,   slot: 3 },
+  { dx:-10, dy:  18, anchor: <span class="str">'end'</span>,   slot: 4 }
 ];
-
-<span class="kw">const</span> placed = [];   <span class="cm">// tracks already-placed label bounding boxes</span>
-
-<span class="kw">function</span> <span class="fn">placeLabel</span>(markerPx, labelText, svgLayer) {
-  <span class="kw">for</span> (<span class="kw">const</span> pos <span class="kw">of</span> POSITIONS) {
-    <span class="kw">const</span> bbox = { x: markerPx.x + pos.dx, y: markerPx.y + pos.dy,
-                   w: labelText.length * 6.5, h: 16 };
-    <span class="kw">if</span> (!<span class="fn">overlaps</span>(bbox, placed)) {
-      placed.<span class="fn">push</span>(bbox);
-      <span class="cm">// draw label + leader line to markerPx if not position ①</span>
-      <span class="kw">return</span> pos;
-    }
-  }
-  <span class="kw">return</span> POSITIONS[0]; <span class="cm">// fallback: use ① even if overlap</span>
-}
-
-<span class="kw">function</span> <span class="fn">overlaps</span>(a, placed) {
-  <span class="kw">return</span> placed.<span class="fn">some</span>(b =>
-    a.x < b.x + b.w && a.x + a.w > b.x &&
-    a.y < b.y + b.h && a.y + a.h > b.y
-  );
-}</pre>
+<span class="cm">/* layoutLabels(): measure pill size → bbox per slot (anchor end = right-aligned origin) → margin + overlap vs other labels, map edge, all marker footprints → leader #666 if slot≠1 → text-shadow halo. */</span></pre>
     </div>
 
-    <div class="callout warn">
-      <span class="callout-icon">⚠️</span>
-      <div class="callout-body"><strong>Note on coordinate scaling:</strong> The Excel file stores coordinates as large integers. Row inspection shows <code>pickup_longitude ≈ −7.398 × 10¹⁶</code> and <code>pickup_latitude ≈ 4.076 × 10¹⁵</code>. Dividing by 10¹⁵ and 10¹⁴ respectively recovers the decimal degrees. After filtering to the NYC bounding box (40.4°–40.95°N, 74.3°–73.5°W) you should have approximately 159 trips available for the sample provided. Verify your coordinates by checking that they cluster in Manhattan and surrounding boroughs.</div>
+    <div class="callout tip">
+      <span class="callout-icon">ℹ️</span>
+      <div class="callout-body"><strong>Data file (Excel / CSV):</strong> The course spreadsheet stores pickup coordinates as scaled integers (same values whether you read <code>.xlsx</code> or export to <code>.csv</code>). This report loads <code>NYC-5April2016-TaxiTrips.csv</code> via <code>fetch</code>; do not rely on raw <code>Number(bigIntegerString)</code> — it loses precision. After ÷10¹⁵ / ÷10¹⁴ and the NYC bounding box (40.4°–40.95°N, −74.3°–−73.5°W), <strong>this CSV build contains 159 valid pickups</strong> (≈6k rows total, most pickups outside the box). Open the folder over <strong>HTTP</strong> (not <code>file://</code>) so the browser can load the CSV next to the HTML.</div>
     </div>
 
   </div>
