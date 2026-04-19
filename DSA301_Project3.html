@@ -193,6 +193,13 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
 }
 .fig-caption{font-size:11.5px;color:var(--dgray);margin-top:12px;font-style:italic;line-height:1.5}
 .figure-submission-img{max-width:100%;height:auto;border-radius:8px;border:1px solid #E2E8F0;display:block;margin:0 auto}
+.t2-lbl-overlay{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:650;overflow:visible}
+.t2-lbl-svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+.t2-lbl-pill{
+  position:absolute;font:700 12px Segoe UI,system-ui,sans-serif;color:#0F172A;white-space:nowrap;padding:4px 10px;
+  background:rgba(255,255,255,0.92);border:1px solid #1A2E4A;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.18);
+  text-shadow:0 0 3px #fff,0 0 6px #fff,0 0 10px #fff,0 0 14px #fff;
+}
 
 /* ── MAP CONTAINER ────────────────────────────────────────────────── */
 .map-container{
@@ -828,6 +835,13 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
         <p style="margin-top:8px">Group the pickup points into <strong>grid cells</strong> of 0.01° × 0.01° (approximately 800 m × 800 m at NYC's latitude). Identify and label the <strong>top 10 cells</strong> by pickup count. These 10 cells are your label anchors. Display their centroids as circle markers, scaled by count.</p>
       </div>
 
+      <div class="fig-wrap" style="padding:0;overflow:hidden;margin-top:4px">
+        <div class="map-label">Task 2 Part A — Top 10 grid cells (centroids, marker radius ∝ count)</div>
+        <div id="t2-parta-status" style="display:none;padding:8px 14px;font-size:12px;background:#FFF7ED;border-bottom:1px solid #FED7AA;color:#92400E"></div>
+        <div id="t2-hotspot-map" style="height:420px"></div>
+        <div class="fig-caption" style="padding:10px 16px">Fig T2-A — Full CSV loaded at runtime from <code>NYC-5April2016-TaxiTrips.csv</code> (same folder as this HTML). Pickup lon/lat are integer strings with thousand separators; they are converted to degrees by ÷10¹⁵ and ÷10¹⁴ without losing precision, then filtered to the NYC bounding box. Each circle is the centroid of one 0.01°×0.01° cell among the ten densest cells. <strong>Serve the project folder over HTTP</strong> (e.g. VS Code Live Server or <code>python3 -m http.server</code>) so <code>fetch</code> can read the CSV; opening the file as <code>file://</code> will block the request.</div>
+      </div>
+
       <div class="task-part">
         <div class="part-label">Part B — Label Implementation (15 pts)</div>
         <p>For each of the 10 hotspot markers, implement label placement following the priority rules described above. Your implementation must:</p>
@@ -838,6 +852,13 @@ body{font-family:var(--font-sans);background:#F0F4F8;color:#1E293B;line-height:1
           <li>Apply a <strong>white text halo</strong> (CSS <code>text-shadow</code> or SVG <code>paint-order: stroke</code>) so labels read clearly over the basemap</li>
           <li>Each label must display the <strong>rank</strong> (1–10) and <strong>pickup count</strong> (e.g., "3 · 47 trips")</li>
         </ul>
+      </div>
+
+      <div class="fig-wrap" style="padding:0;overflow:hidden;margin-top:4px">
+        <div class="map-label">Task 2 Part B — Priority label placement + leader lines (same top-10 cells)</div>
+        <div id="t2-partb-status" style="display:none;padding:8px 14px;font-size:12px;background:#FFF7ED;border-bottom:1px solid #FED7AA;color:#92400E"></div>
+        <div id="t2-label-map" style="height:420px"></div>
+        <div class="fig-caption" style="padding:10px 16px">Fig T2-B — Separate map: circle markers match Part A; labels use offsets ①–④ from the assignment, bounding-box overlap against other labels, map margins, and anchor circle footprints; leader segments (<code>#666</code>, 1px) when the chosen slot is not ①; white <code>text-shadow</code> halo. Re-layout runs on zoom / pan.</div>
       </div>
 
       <div class="task-part">
@@ -1265,6 +1286,384 @@ const obs = new IntersectionObserver(entries => {
   });
 },{threshold:0.15, rootMargin:'-5% 0px -60% 0px'});
 secIds.forEach(id => { const el = document.getElementById(id); if(el) obs.observe(el); });
+
+// ── TASK 2 PART A — CSV → degrees (exact), 0.01° grid, top-10 map ───
+function parseCSVLine(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') { inQ = false; continue; }
+      cur += c;
+    } else {
+      if (c === '"') { inQ = true; continue; }
+      if (c === ',') { out.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+/** Integer strings in CSV exceed Number.MAX_SAFE_INTEGER; place decimal without float rounding. */
+function scaledIntStringToDecimalDegrees(intStr, divisorExp) {
+  const raw = String(intStr).replace(/,/g, '').trim();
+  if (!/^-?\d+$/.test(raw)) return NaN;
+  const neg = raw[0] === '-';
+  const abs = neg ? raw.slice(1) : raw;
+  const pad = abs.length - divisorExp;
+  let mantissa;
+  if (pad <= 0) mantissa = '0.' + '0'.repeat(-pad) + abs;
+  else mantissa = abs.slice(0, pad) + '.' + abs.slice(pad);
+  return parseFloat((neg ? '-' : '') + mantissa);
+}
+
+function parseTripsFromCSVText(text) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return [];
+  const header = parseCSVLine(lines[0]).map(h => h.trim());
+  const iLon = header.indexOf('pickup_longitude');
+  const iLat = header.indexOf('pickup_latitude');
+  if (iLon < 0 || iLat < 0) return [];
+  const trips = [];
+  for (let L = 1; L < lines.length; L++) {
+    const cols = parseCSVLine(lines[L]);
+    if (cols.length <= Math.max(iLon, iLat)) continue;
+    const lon = scaledIntStringToDecimalDegrees(cols[iLon], 15);
+    const lat = scaledIntStringToDecimalDegrees(cols[iLat], 14);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+    if (lat > 40.4 && lat < 40.95 && lon > -74.3 && lon < -73.5)
+      trips.push({ lat, lon });
+  }
+  return trips;
+}
+
+function clusterToGridTop10(points, cellSize) {
+  const grid = new Map();
+  points.forEach(p => {
+    const gi = Math.floor(p.lat / cellSize);
+    const gj = Math.floor(p.lon / cellSize);
+    const key = gi + ',' + gj;
+    let c = grid.get(key);
+    if (!c) {
+      c = { count: 0, sumLat: 0, sumLon: 0 };
+      grid.set(key, c);
+    }
+    c.count++;
+    c.sumLat += p.lat;
+    c.sumLon += p.lon;
+  });
+  return [...grid.values()]
+    .map(c => ({
+      count: c.count,
+      lat: c.sumLat / c.count,
+      lon: c.sumLon / c.count
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+}
+
+(function initTask2PartA() {
+  const mapEl = document.getElementById('t2-hotspot-map');
+  const statusEl = document.getElementById('t2-parta-status');
+  if (!mapEl || typeof L === 'undefined') return;
+
+  function showStatus(msg, isErr) {
+    if (!statusEl) return;
+    statusEl.style.display = 'block';
+    statusEl.textContent = msg;
+    statusEl.style.background = isErr ? '#FEE2E2' : '#EFF6FF';
+    statusEl.style.borderBottomColor = isErr ? '#FECACA' : '#BFDBFE';
+    statusEl.style.color = isErr ? '#991B1B' : '#1E40AF';
+  }
+
+  fetch('NYC-5April2016-TaxiTrips.csv')
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(text => {
+      const trips = parseTripsFromCSVText(text);
+      const top10 = clusterToGridTop10(trips, 0.01);
+      if (!top10.length) {
+        showStatus('No trips passed the NYC bounding-box filter after parsing.', true);
+        return;
+      }
+
+      const t2Map = L.map('t2-hotspot-map', { scrollWheelZoom: false }).setView([40.75, -73.97], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(t2Map);
+
+      const maxC = top10[0].count;
+      top10.forEach((cell, idx) => {
+        const rank = idx + 1;
+        const radius = 6 + (cell.count / maxC) * 18;
+        L.circleMarker([cell.lat, cell.lon], {
+          radius,
+          color: '#1A2E4A',
+          weight: 2,
+          fillColor: '#0F6B6B',
+          fillOpacity: 0.55 + (11 - rank) * 0.03
+        })
+          .bindPopup(`<strong>#${rank}</strong> · ${cell.count} pickups<br><span style="font-size:11px;color:#64748B">Cell centroid (mean of pickups in 0.01°×0.01°)</span>`)
+          .addTo(t2Map);
+      });
+
+      const bounds = L.latLngBounds(top10.map(c => [c.lat, c.lon]));
+      t2Map.fitBounds(bounds.pad(0.22));
+
+      let didFitAfterLayout = false;
+      const io = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (!e.isIntersecting) return;
+          t2Map.invalidateSize();
+          if (!didFitAfterLayout) {
+            t2Map.fitBounds(bounds.pad(0.22));
+            didFitAfterLayout = true;
+          }
+        });
+      }, { threshold: 0.12 });
+      io.observe(mapEl);
+      setTimeout(() => { t2Map.invalidateSize(); t2Map.fitBounds(bounds.pad(0.22)); }, 350);
+    })
+    .catch(() => {
+      showStatus('Could not load NYC-5April2016-TaxiTrips.csv. Open this folder via a local web server (not file://) so the browser can fetch the CSV next to this HTML.', true);
+    });
+})();
+
+// ── TASK 2 PART B — second map: priority labels, overlap, leaders ──
+const T2_LABEL_POSITIONS = [
+  { dx: 10, dy: -20, anchor: 'start', slot: 1 },
+  { dx: 10, dy: 18, anchor: 'start', slot: 2 },
+  { dx: -10, dy: -20, anchor: 'end', slot: 3 },
+  { dx: -10, dy: 18, anchor: 'end', slot: 4 }
+];
+
+function t2MeasureLabel(text) {
+  const el = document.createElement('span');
+  el.className = 't2-lbl-pill';
+  el.textContent = text;
+  el.style.visibility = 'hidden';
+  el.style.position = 'absolute';
+  document.body.appendChild(el);
+  const w = Math.ceil(el.offsetWidth) + 2;
+  const h = Math.ceil(el.offsetHeight) + 2;
+  document.body.removeChild(el);
+  return { w: Math.max(w, 72), h: Math.max(h, 22) };
+}
+
+function t2BBoxForSlot(mx, my, pos, lw, lh) {
+  if (pos.anchor === 'end')
+    return { x: mx + pos.dx - lw, y: my + pos.dy, w: lw, h: lh };
+  return { x: mx + pos.dx, y: my + pos.dy, w: lw, h: lh };
+}
+
+function t2RectOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function t2RectInsideMargins(r, mapW, mapH, m) {
+  return r.x >= m && r.y >= m && r.x + r.w <= mapW - m && r.y + r.h <= mapH - m;
+}
+
+function t2CircleFootprint(mx, my, rPad) {
+  const s = (rPad + 4) * 2;
+  return { x: mx - rPad - 4, y: my - rPad - 4, w: s, h: s };
+}
+
+function t2ClosestBorderPoint(mx, my, b) {
+  const nx = Math.min(Math.max(mx, b.x), b.x + b.w);
+  const ny = Math.min(Math.max(my, b.y), b.y + b.h);
+  if (nx === mx && ny === my) {
+    const dTop = my - b.y;
+    const dBot = b.y + b.h - my;
+    const dLeft = mx - b.x;
+    const dRight = b.x + b.w - mx;
+    const m = Math.min(dTop, dBot, dLeft, dRight);
+    if (m === dTop) return { x: mx, y: b.y };
+    if (m === dBot) return { x: mx, y: b.y + b.h };
+    if (m === dLeft) return { x: b.x, y: my };
+    return { x: b.x + b.w, y: my };
+  }
+  return { x: nx, y: ny };
+}
+
+(function initTask2PartB() {
+  const mapEl = document.getElementById('t2-label-map');
+  const statusEl = document.getElementById('t2-partb-status');
+  if (!mapEl || typeof L === 'undefined') return;
+
+  function showStatus(msg, isErr) {
+    if (!statusEl) return;
+    statusEl.style.display = 'block';
+    statusEl.textContent = msg;
+    statusEl.style.background = isErr ? '#FEE2E2' : '#EFF6FF';
+    statusEl.style.borderBottomColor = isErr ? '#FECACA' : '#BFDBFE';
+    statusEl.style.color = isErr ? '#991B1B' : '#1E40AF';
+  }
+
+  fetch('NYC-5April2016-TaxiTrips.csv')
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(text => {
+      const trips = parseTripsFromCSVText(text);
+      const top10 = clusterToGridTop10(trips, 0.01);
+      if (!top10.length) {
+        showStatus('No trips in bbox — cannot build Part B map.', true);
+        return;
+      }
+
+      const labelMap = L.map('t2-label-map', { scrollWheelZoom: false }).setView([40.75, -73.97], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(labelMap);
+
+      const maxC = top10[0].count;
+      const markers = [];
+      top10.forEach((cell, idx) => {
+        const rank = idx + 1;
+        const rpx = 6 + (cell.count / maxC) * 18;
+        const m = L.circleMarker([cell.lat, cell.lon], {
+          radius: rpx,
+          color: '#1A2E4A',
+          weight: 2,
+          fillColor: '#0F6B6B',
+          fillOpacity: 0.55 + (11 - rank) * 0.03
+        }).addTo(labelMap);
+        markers.push({ latlng: L.latLng(cell.lat, cell.lon), rpx, rank, count: cell.count, layer: m });
+      });
+
+      const bounds = L.latLngBounds(top10.map(c => [c.lat, c.lon]));
+      labelMap.fitBounds(bounds.pad(0.22));
+
+      const overlay = L.DomUtil.create('div', 't2-lbl-overlay', labelMap.getContainer());
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 't2-lbl-svg');
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      overlay.appendChild(svg);
+
+      function layoutLabels() {
+        const rect = labelMap.getContainer().getBoundingClientRect();
+        const w = labelMap.getSize().x;
+        const h = labelMap.getSize().y;
+        svg.setAttribute('width', String(w));
+        svg.setAttribute('height', String(h));
+        svg.innerHTML = '';
+        overlay.querySelectorAll('.t2-lbl-pill').forEach(n => n.remove());
+
+        const margin = 10;
+        const placed = [];
+        const footprints = markers.map((mk, i) => {
+          const p = labelMap.latLngToContainerPoint(mk.latlng);
+          return { mx: p.x, my: p.y, r: mk.rpx, idx: i };
+        });
+
+        const placements = [];
+        markers.forEach((mk, idx) => {
+          const pt = labelMap.latLngToContainerPoint(mk.latlng);
+          const mx = pt.x;
+          const my = pt.y;
+          const mr = mk.rpx;
+          const labelText = mk.rank + ' · ' + mk.count + ' trips';
+          const { w: lw, h: lh } = t2MeasureLabel(labelText);
+
+          let chosen = null;
+          let chosenSlot = 0;
+          for (let pi = 0; pi < T2_LABEL_POSITIONS.length; pi++) {
+            const pos = T2_LABEL_POSITIONS[pi];
+            const box = t2BBoxForSlot(mx, my, pos, lw, lh);
+            if (!t2RectInsideMargins(box, w, h, margin)) continue;
+
+            let hit = false;
+            const selfFoot = t2CircleFootprint(mx, my, mr);
+            if (t2RectOverlap(box, selfFoot)) hit = true;
+            if (hit) continue;
+
+            for (const q of footprints) {
+              if (q.idx === idx) continue;
+              const f = t2CircleFootprint(q.mx, q.my, q.r);
+              if (t2RectOverlap(box, f)) {
+                hit = true;
+                break;
+              }
+            }
+            if (hit) continue;
+
+            for (const pr of placed) {
+              if (t2RectOverlap(box, pr)) {
+                hit = true;
+                break;
+              }
+            }
+            if (hit) continue;
+
+            chosen = box;
+            chosenSlot = pos.slot;
+            break;
+          }
+
+          if (!chosen) {
+            const pos = T2_LABEL_POSITIONS[0];
+            chosen = t2BBoxForSlot(mx, my, pos, lw, lh);
+            chosenSlot = 1;
+          }
+
+          placed.push(chosen);
+          placements.push({ mx, my, chosen, chosenSlot, labelText });
+        });
+
+        placements.forEach(({ mx, my, chosen, chosenSlot }) => {
+          if (chosenSlot !== 1) {
+            const end = t2ClosestBorderPoint(mx, my, chosen);
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', String(mx));
+            line.setAttribute('y1', String(my));
+            line.setAttribute('x2', String(end.x));
+            line.setAttribute('y2', String(end.y));
+            line.setAttribute('stroke', '#666');
+            line.setAttribute('stroke-width', '1');
+            svg.appendChild(line);
+          }
+        });
+
+        placements.forEach(({ chosen, labelText }) => {
+          const pill = L.DomUtil.create('div', 't2-lbl-pill', overlay);
+          pill.textContent = labelText;
+          pill.style.left = chosen.x + 'px';
+          pill.style.top = chosen.y + 'px';
+        });
+      }
+
+      labelMap.on('moveend zoomend viewreset', layoutLabels);
+      let didFit = false;
+      const io = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (!e.isIntersecting) return;
+          labelMap.invalidateSize();
+          if (!didFit) {
+            labelMap.fitBounds(bounds.pad(0.22));
+            didFit = true;
+          }
+          layoutLabels();
+        });
+      }, { threshold: 0.12 });
+      io.observe(mapEl);
+      setTimeout(() => {
+        labelMap.invalidateSize();
+        labelMap.fitBounds(bounds.pad(0.22));
+        layoutLabels();
+      }, 400);
+    })
+    .catch(() => {
+      showStatus('Could not load CSV for Part B (use a local HTTP server).', true);
+    });
+})();
 
 // ── TAXI SAMPLE DATA (159 valid points from April 5, 2016) ─────────
 const SAMPLE_POINTS = [[40.76276,-73.98214],[40.73346,-74.0023],[40.77411,-73.87306],[40.77411,-73.8729],[40.74994,-73.97253],[40.76215,-73.96215],[40.75616,-73.99035],[40.76532,-73.97652],[40.76532,-73.95814],[40.75177,-73.98805],[40.77631,-73.95585],[40.80475,-73.94786],[40.78412,-73.97382],[40.78802,-73.97098],[40.64471,-73.78197],[40.7652,-73.96201],[40.76141,-73.99404],[40.74652,-73.97215],[40.77399,-73.87285],[40.75165,-73.97074],[40.76752,-73.9623],[40.73724,-73.99272],[40.76678,-73.98238],[40.74579,-73.98213],[40.77045,-73.9818],[40.71478,-74.01604],[40.74213,-73.9078],[40.74713,-74.00139],[40.74591,-73.97189],[40.70905,-74.00206],[40.75348,-73.97258],[40.74176,-74.00101],[40.75177,-73.99004],[40.75177,-73.981],[40.73297,-74.00019],[40.73346,-73.9997],[40.75592,-73.97917],[40.74469,-73.97598],[40.64862,-73.78372],[40.71588,-74.00266],[40.75653,-73.98971],[40.76825,-73.98206],[40.7536,-73.97388],[40.73138,-73.98246],[40.74042,-73.98631],[40.73358,-73.98759],[40.74298,-74.00024],[40.75104,-73.99374],[40.64484,-73.78213],[40.72821,-73.98205],[40.77985,-73.95577],[40.64496,-73.79158],[40.76581,-73.96349],[40.74335,-73.99621],[40.79535,-73.97129],[40.78973,-73.9662],[40.75299,-73.98527],[40.76471,-73.97279],[40.75323,-73.97472],[40.77679,-73.94917],[40.75519,-73.9754],[40.75763,-73.97581],[40.77704,-73.95992],[40.76141,-73.97922],[40.72711,-73.99975],[40.77435,-73.87325],[40.76129,-73.97297],[40.70514,-74.00521],[40.76495,-73.9819],[40.75043,-73.9877],[40.76788,-73.9896],[40.72015,-73.97871],[40.75616,-73.97915],[40.77875,-73.98222],[40.73065,-73.98069],[40.77533,-73.95584],[40.75885,-73.97465],[40.73224,-73.98483],[40.78119,-73.95437],[40.75238,-73.98576],[40.76703,-73.9828],[40.77875,-73.95835],[40.80182,-73.95723],[40.7265,-73.98608],[40.75214,-73.98995],[40.64374,-73.79007],[40.75214,-74.00462],[40.76434,-73.98052],[40.74933,-74.0028],[40.76471,-73.96822],[40.78278,-73.94819],[40.75922,-73.98161],[40.77423,-73.95698],[40.7558,-73.99101],[40.80756,-73.92701],[40.74982,-73.9749],[40.77362,-73.95565],[40.74054,-74.00185],[40.64447,-73.78271],[40.76166,-73.96205],[40.76007,-73.97419],[40.75641,-73.975],[40.7475,-74.00804],[40.76837,-73.98207],[40.80536,-73.96605],[40.75934,-73.9725],[40.75934,-73.97261],[40.7641,-73.98251],[40.71991,-74.00843],[40.73175,-73.97422],[40.74017,-74.00536],[40.75763,-73.96217],[40.74139,-73.97519],[40.72467,-73.99556],[40.7453,-74.00583],[40.78741,-73.96807],[40.76056,-73.97213],[40.77924,-73.95095],[40.75494,-73.99248],[40.72345,-74.00317],[40.72382,-73.99266],[40.78607,-73.97813],[40.74774,-74.0044],[40.75885,-73.96127],[40.72479,-73.99406],[40.70343,-74.01009],[40.72504,-73.99216],[40.75153,-73.98235],[40.75421,-73.96577],[40.72101,-74.00078],[40.76703,-73.98351],[40.76764,-73.98192],[40.69183,-73.98251],[40.74249,-73.98256],[40.80658,-73.96482],[40.77179,-73.9827],[40.75018,-73.99393],[40.75946,-73.98809],[40.72577,-73.99204],[40.76166,-73.98827],[40.77301,-73.98232],[40.71808,-73.99083],[40.73517,-74.00606],[40.71991,-73.99184],[40.70819,-74.0033],[40.77203,-73.98648],[40.76215,-73.97929],[40.7381,-73.98369],[40.77411,-73.8729],[40.75922,-73.97875],[40.76276,-73.97869],[40.7641,-73.98463],[40.77411,-73.87326],[40.74615,-73.99419],[40.7746,-73.96385],[40.74359,-73.98374],[40.73822,-73.9887],[40.7337,-73.98715],[40.75885,-73.9995]];
